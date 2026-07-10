@@ -6,6 +6,7 @@ import { FarmTile } from '../entities/FarmTile';
 import { Player } from '../entities/Player';
 import { GrowthSystem } from '../systems/GrowthSystem';
 import { CROPS } from '../entities/CropConfig';
+import { Toolbar } from '../ui/Toolbar';
 
 export class FarmScene extends Phaser.Scene {
   private tileGrid: FarmTile[][] = [];
@@ -25,6 +26,7 @@ export class FarmScene extends Phaser.Scene {
     goldText: Phaser.GameObjects.Text;
     toolText: Phaser.GameObjects.Text;
   };
+  private toolbar!: Toolbar;
 
   constructor() {
     super({ key: 'FarmScene' });
@@ -57,13 +59,19 @@ export class FarmScene extends Phaser.Scene {
       right: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D)
     };
 
-    this.input.keyboard!.on('keydown-ONE', () => this.setTool(ToolType.PLOW));
-    this.input.keyboard!.on('keydown-TWO', () => this.setTool(ToolType.SEED));
-    this.input.keyboard!.on('keydown-THREE', () => this.setTool(ToolType.HARVEST));
+    this.input.keyboard!.on('keydown-ONE', () => this.toolbar.selectTool(ToolType.PLOW));
+    this.input.keyboard!.on('keydown-TWO', () => this.toolbar.selectTool(ToolType.SEED));
+    this.input.keyboard!.on('keydown-THREE', () => this.toolbar.selectTool(ToolType.HARVEST));
     this.input.keyboard!.on('keydown-E', () => this.toggleShop());
     this.input.keyboard!.on('keydown-SPACE', () => this.interactWithFacingTile());
 
     this.createHUD();
+
+    this.toolbar = new Toolbar(this);
+    this.toolbar.setOnToolChange((tool: ToolType) => {
+      this.currentTool = tool;
+      this.updateHUD();
+    });
 
     this.updateTileVisibility();
     this.updateHUD();
