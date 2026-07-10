@@ -20,7 +20,7 @@ export class Toolbar {
   }
 
   private create(): void {
-    const bg = this.scene.add.rectangle(400, 582, 800, 36, GAME_CONFIG.COLORS.TOOLBAR_BG)
+    this.scene.add.rectangle(400, 582, 800, 36, GAME_CONFIG.COLORS.TOOLBAR_BG)
       .setDepth(100).setScrollFactor(0);
 
     const tools: { tool: ToolType; label: string; key: string }[] = [

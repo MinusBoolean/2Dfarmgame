@@ -1,8 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_CONFIG } from '../config';
-import { CropConfig, ToolType } from '../types';
+import { CropConfig } from '../types';
 import { getUnlockedCrops } from '../entities/CropConfig';
-import { EconomySystem } from '../systems/EconomySystem';
 
 interface ShopItem {
   rect: Phaser.GameObjects.Rectangle;
@@ -144,6 +143,7 @@ export class ShopPanel {
       fontSize: '16px', color: '#ff8888'
     }).setOrigin(0.5);
     this.container.add(rightLabel);
+    this.items.push({ rect: null as any, nameText: rightLabel, priceText: null as any, actionText: null as any, crop: null as any, isBuy: false });
 
     let sellIndex = 0;
     for (const [cropId, count] of Object.entries(this.inventory)) {
@@ -182,6 +182,7 @@ export class ShopPanel {
         fontSize: '13px', color: '#888888'
       }).setOrigin(0.5);
       this.container.add(emptyText);
+      this.items.push({ rect: null as any, nameText: emptyText, priceText: null as any, actionText: null as any, crop: null as any, isBuy: false });
     }
   }
 
@@ -193,20 +194,6 @@ export class ShopPanel {
       if (item.actionText) item.actionText.destroy();
     });
     this.items = [];
-
-    this.container.each((child: Phaser.GameObjects.GameObject) => {
-      if (
-        child.type === 'Text' &&
-        !['商 店', 'X'].includes((child as Phaser.GameObjects.Text).text) &&
-        (child as Phaser.GameObjects.Text).text !== '购买种子' &&
-        (child as Phaser.GameObjects.Text).text !== '出售作物'
-      ) {
-        child.destroy();
-      }
-      if (child.type === 'Rectangle' && child !== this.container.getAt(0) && child !== this.container.getAt(1)) {
-        child.destroy();
-      }
-    });
   }
 
   destroy(): void {

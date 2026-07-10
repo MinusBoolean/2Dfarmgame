@@ -10,7 +10,7 @@ import { Toolbar } from '../ui/Toolbar';
 import { ShopPanel } from '../ui/ShopPanel';
 import { SeedSelector } from '../ui/SeedSelector';
 import { EconomySystem } from '../systems/EconomySystem';
-import { getCropById, getUnlockedCrops } from '../entities/CropConfig';
+import { getUnlockedCrops } from '../entities/CropConfig';
 
 export class FarmScene extends Phaser.Scene {
   private tileGrid: FarmTile[][] = [];
@@ -85,7 +85,7 @@ export class FarmScene extends Phaser.Scene {
 
     const unlockBtn = this.add.rectangle(760, 58, 64, 26, GAME_CONFIG.COLORS.BUTTON)
       .setDepth(101).setScrollFactor(0).setInteractive({ useHandCursor: true });
-    const unlockLabel = this.add.text(760, 58, '扩地', {
+    this.add.text(760, 58, '扩地', {
       fontSize: '13px', color: '#ffffff'
     }).setDepth(102).setScrollFactor(0).setOrigin(0.5);
 
@@ -195,6 +195,15 @@ export class FarmScene extends Phaser.Scene {
       this.highlightedTile.highlight(false);
       this.highlightedTile = null;
     }
+
+    for (let row = 0; row < GAME_CONFIG.GRID_ROWS; row++) {
+      for (let col = 0; col < GAME_CONFIG.GRID_COLS; col++) {
+        if (this.tileGrid[row][col].tileData.state === 'growing') {
+          this.tileGrid[row][col].updateAppearance();
+        }
+      }
+    }
+
     const facing = this.player.getFacingTile();
     if (
       facing.row >= 0 && facing.row < GAME_CONFIG.GRID_ROWS &&
@@ -264,14 +273,11 @@ export class FarmScene extends Phaser.Scene {
 
       case ToolType.HARVEST:
         if (data.state === 'mature' && data.cropId) {
-          const { inventory, totalEarned, gold } = this.saveData;
           const cropId = data.cropId;
-          const newInventory = { ...inventory };
+          const newInventory = { ...this.saveData.inventory };
           newInventory[cropId] = (newInventory[cropId] || 0) + 1;
 
           this.saveData.inventory = newInventory;
-          this.saveData.gold = gold;
-          this.saveData.totalEarned = totalEarned;
           this.saveData.farmGrid[tile.row][tile.col] = {
             state: 'empty',
             cropId: null,

@@ -1,4 +1,5 @@
 import { getCropById } from '../entities/CropConfig';
+import { GAME_CONFIG } from '../config';
 
 interface BuyResult {
   success: boolean;
@@ -71,11 +72,11 @@ export class EconomySystem {
   }
 
   static getUnlockedCols(unlockedTiles: number): number {
-    return Math.min(Math.ceil(Math.sqrt(unlockedTiles)), 8);
+    return Math.min(Math.ceil(Math.sqrt(unlockedTiles)), GAME_CONFIG.GRID_COLS);
   }
 
   static getUnlockedRows(unlockedTiles: number): number {
     const cols = EconomySystem.getUnlockedCols(unlockedTiles);
-    return Math.min(Math.ceil(unlockedTiles / cols), 8);
+    return Math.min(Math.ceil(unlockedTiles / cols), GAME_CONFIG.GRID_ROWS);
   }
 }

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { TileData } from '../types';
 import { GAME_CONFIG } from '../config';
 import { getCropById } from './CropConfig';
+import { EconomySystem } from '../systems/EconomySystem';
 
 export class FarmTile extends Phaser.GameObjects.Rectangle {
   public row: number;
@@ -81,8 +82,8 @@ export class FarmTile extends Phaser.GameObjects.Rectangle {
   }
 
   isUnlocked(currentUnlockedTiles: number): boolean {
-    const cols = Math.min(Math.ceil(Math.sqrt(currentUnlockedTiles)), GAME_CONFIG.GRID_COLS);
-    const rows = Math.min(Math.ceil(currentUnlockedTiles / cols), GAME_CONFIG.GRID_ROWS);
+    const cols = EconomySystem.getUnlockedCols(currentUnlockedTiles);
+    const rows = EconomySystem.getUnlockedRows(currentUnlockedTiles);
     return this.row < rows && this.col < cols;
   }
 
