@@ -83,6 +83,24 @@ export class FarmScene extends Phaser.Scene {
       this.updateHUD();
     });
 
+    const unlockBtn = this.add.rectangle(760, 58, 64, 26, GAME_CONFIG.COLORS.BUTTON)
+      .setDepth(101).setScrollFactor(0).setInteractive({ useHandCursor: true });
+    const unlockLabel = this.add.text(760, 58, '扩地', {
+      fontSize: '13px', color: '#ffffff'
+    }).setDepth(102).setScrollFactor(0).setOrigin(0.5);
+
+    unlockBtn.on('pointerdown', () => this.unlockTile());
+    unlockBtn.on('pointerover', () => unlockBtn.setFillStyle(GAME_CONFIG.COLORS.BUTTON_HOVER));
+    unlockBtn.on('pointerout', () => unlockBtn.setFillStyle(GAME_CONFIG.COLORS.BUTTON));
+
+    const newGameBtn = this.add.rectangle(60, 58, 80, 26, 0xaa4444)
+      .setDepth(101).setScrollFactor(0).setInteractive({ useHandCursor: true });
+    this.add.text(60, 58, '新游戏', {
+      fontSize: '13px', color: '#ffffff'
+    }).setDepth(102).setScrollFactor(0).setOrigin(0.5);
+
+    newGameBtn.on('pointerdown', () => this.resetGame());
+
     this.updateTileVisibility();
     this.updateHUD();
   }
@@ -123,7 +141,9 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private updateHUD(): void {
-    this.hudTexts.goldText.setText(`金币: ${this.saveData.gold}`);
+    this.hudTexts.goldText.setText(
+      `金币: ${this.saveData.gold} | 地块: ${this.saveData.unlockedTiles}`
+    );
     const toolNames: Record<ToolType, string> = {
       [ToolType.PLOW]: '翻地 [1]',
       [ToolType.SEED]: '播种 [2]',
@@ -349,5 +369,50 @@ export class FarmScene extends Phaser.Scene {
         (id) => this.handleBuy(id), (id) => this.handleSell(id)
       );
     }
+  }
+
+  private unlockTile(): void {
+    const cost = EconomySystem.getUnlockCost(this.saveData.unlockedTiles);
+    const maxTiles = GAME_CONFIG.GRID_COLS * GAME_CONFIG.GRID_ROWS;
+
+    if (this.saveData.unlockedTiles >= maxTiles) {
+      this.showMessage('地块已全部解锁!');
+      return;
+    }
+
+    if (this.saveData.gold < cost) {
+      this.showMessage(`金币不足! 需要 ${cost}G`);
+      return;
+    }
+
+    this.saveData.gold -= cost;
+    this.saveData.unlockedTiles += 1;
+    this.updateTileVisibility();
+    this.updateHUD();
+    this.saveGame();
+    this.showMessage(`解锁新地块! (-${cost}G)`);
+  }
+
+  private showMessage(text: string): void {
+    const msg = this.add.text(400, 100, text, {
+      fontSize: '18px',
+      color: '#ffffff',
+      backgroundColor: '#000000aa',
+      padding: { x: 12, y: 6 }
+    }).setOrigin(0.5).setDepth(300);
+
+    this.tweens.add({
+      targets: msg,
+      alpha: 0,
+      y: 80,
+      duration: 1500,
+      ease: 'Power2',
+      onComplete: () => msg.destroy()
+    });
+  }
+
+  private resetGame(): void {
+    SaveSystem.clear();
+    this.scene.restart();
   }
 }
