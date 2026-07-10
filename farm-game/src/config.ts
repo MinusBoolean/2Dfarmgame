@@ -1,0 +1,29 @@
+export const GAME_CONFIG = {
+  WIDTH: 800,
+  HEIGHT: 600,
+  TILE_SIZE: 64,
+  GRID_COLS: 8,
+  GRID_ROWS: 8,
+  INITIAL_UNLOCKED_TILES: 16,
+  INITIAL_GOLD: 100,
+  PLAYER_SPEED: 160,
+  SAVE_KEY: 'farm_game_save',
+  GRID_OFFSET_X: 144,
+  GRID_OFFSET_Y: 44,
+  TILE_EXPANSION_COST: 200,
+  COLORS: {
+    GRASS: 0x4a7c3f,
+    PLOWED: 0x8b6914,
+    GROWING: 0x6baa3e,
+    EMPTY_HIGHLIGHT: 0x5a9c4f,
+    PLAYER: 0x4488ff,
+    HUD_BG: 0x2d2d2d,
+    HUD_TEXT: '#ffffff',
+    TOOLBAR_BG: 0x3d3d3d,
+    SHOP_BG: 0x1a1a2e,
+    SHOP_PANEL: 0x2d2d44,
+    BUTTON: 0x4a4a6a,
+    BUTTON_HOVER: 0x6a6a8a,
+    GOLD_COLOR: '#ffd700'
+  }
+} as const;
