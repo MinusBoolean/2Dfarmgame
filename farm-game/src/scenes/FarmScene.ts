@@ -8,6 +8,7 @@ import { GrowthSystem } from '../systems/GrowthSystem';
 import { CROPS } from '../entities/CropConfig';
 import { Toolbar } from '../ui/Toolbar';
 import { ShopPanel } from '../ui/ShopPanel';
+import { SeedSelector } from '../ui/SeedSelector';
 import { EconomySystem } from '../systems/EconomySystem';
 import { getCropById, getUnlockedCrops } from '../entities/CropConfig';
 
@@ -31,6 +32,7 @@ export class FarmScene extends Phaser.Scene {
   };
   private toolbar!: Toolbar;
   private shopPanel!: ShopPanel;
+  private seedSelector!: SeedSelector;
 
   constructor() {
     super({ key: 'FarmScene' });
@@ -72,6 +74,8 @@ export class FarmScene extends Phaser.Scene {
     this.createHUD();
 
     this.shopPanel = new ShopPanel(this);
+
+    this.seedSelector = new SeedSelector(this);
 
     this.toolbar = new Toolbar(this);
     this.toolbar.setOnToolChange((tool: ToolType) => {
@@ -224,22 +228,17 @@ export class FarmScene extends Phaser.Scene {
 
       case ToolType.SEED:
         if (data.state === 'plowed') {
-          const inventory = this.saveData.inventory;
-          const firstSeed = Object.keys(inventory).find(k => (inventory[k] || 0) > 0);
-          if (firstSeed) {
-            const newInventory = { ...inventory };
-            newInventory[firstSeed] = (newInventory[firstSeed] || 1) - 1;
-            if (newInventory[firstSeed] <= 0) delete newInventory[firstSeed];
+          const seeds = Object.entries(this.saveData.inventory).filter(([_, c]) => c > 0);
+          if (seeds.length === 0) break;
 
-            this.saveData.inventory = newInventory;
-            this.saveData.farmGrid[tile.row][tile.col] = {
-              state: 'growing',
-              cropId: firstSeed,
-              plantTime: this.time.now
-            };
-            tile.setTileData(this.saveData.farmGrid[tile.row][tile.col]);
-            this.saveGame();
-          }
+          this.seedSelector.show(
+            tile.getWorldX(),
+            tile.getWorldY() - GAME_CONFIG.TILE_SIZE,
+            this.saveData.inventory,
+            (cropId: string) => {
+              this.plantSeed(tile, cropId);
+            }
+          );
         }
         break;
 
@@ -266,6 +265,22 @@ export class FarmScene extends Phaser.Scene {
         }
         break;
     }
+  }
+
+  private plantSeed(tile: FarmTile, cropId: string): void {
+    const newInventory = { ...this.saveData.inventory };
+    newInventory[cropId] = (newInventory[cropId] || 1) - 1;
+    if (newInventory[cropId] <= 0) delete newInventory[cropId];
+
+    this.saveData.inventory = newInventory;
+    this.saveData.farmGrid[tile.row][tile.col] = {
+      state: 'growing',
+      cropId,
+      plantTime: this.time.now
+    };
+    tile.setTileData(this.saveData.farmGrid[tile.row][tile.col]);
+    this.updateHUD();
+    this.saveGame();
   }
 
   private checkCropUnlocks(): void {
