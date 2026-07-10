@@ -7,6 +7,9 @@ import { Player } from '../entities/Player';
 import { GrowthSystem } from '../systems/GrowthSystem';
 import { CROPS } from '../entities/CropConfig';
 import { Toolbar } from '../ui/Toolbar';
+import { ShopPanel } from '../ui/ShopPanel';
+import { EconomySystem } from '../systems/EconomySystem';
+import { getCropById, getUnlockedCrops } from '../entities/CropConfig';
 
 export class FarmScene extends Phaser.Scene {
   private tileGrid: FarmTile[][] = [];
@@ -27,6 +30,7 @@ export class FarmScene extends Phaser.Scene {
     toolText: Phaser.GameObjects.Text;
   };
   private toolbar!: Toolbar;
+  private shopPanel!: ShopPanel;
 
   constructor() {
     super({ key: 'FarmScene' });
@@ -66,6 +70,8 @@ export class FarmScene extends Phaser.Scene {
     this.input.keyboard!.on('keydown-SPACE', () => this.interactWithFacingTile());
 
     this.createHUD();
+
+    this.shopPanel = new ShopPanel(this);
 
     this.toolbar = new Toolbar(this);
     this.toolbar.setOnToolChange((tool: ToolType) => {
@@ -218,7 +224,22 @@ export class FarmScene extends Phaser.Scene {
 
       case ToolType.SEED:
         if (data.state === 'plowed') {
-          // TODO: will be connected to seed selection UI in Task 13
+          const inventory = this.saveData.inventory;
+          const firstSeed = Object.keys(inventory).find(k => (inventory[k] || 0) > 0);
+          if (firstSeed) {
+            const newInventory = { ...inventory };
+            newInventory[firstSeed] = (newInventory[firstSeed] || 1) - 1;
+            if (newInventory[firstSeed] <= 0) delete newInventory[firstSeed];
+
+            this.saveData.inventory = newInventory;
+            this.saveData.farmGrid[tile.row][tile.col] = {
+              state: 'growing',
+              cropId: firstSeed,
+              plantTime: this.time.now
+            };
+            tile.setTileData(this.saveData.farmGrid[tile.row][tile.col]);
+            this.saveGame();
+          }
         }
         break;
 
@@ -266,7 +287,52 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private toggleShop(): void {
-    // Connected to ShopPanel in Task 12
-    console.log('Shop toggled');
+    const unlockedCrops = getUnlockedCrops(this.saveData.totalEarned, this.saveData.unlockedCrops);
+    this.shopPanel.toggle(
+      this.saveData.gold,
+      this.saveData.totalEarned,
+      unlockedCrops.map(c => c.id),
+      this.saveData.inventory,
+      (cropId) => this.handleBuy(cropId),
+      (cropId) => this.handleSell(cropId)
+    );
+  }
+
+  private handleBuy(cropId: string): void {
+    const result = EconomySystem.buySeed(cropId, this.saveData.gold, this.saveData.inventory);
+    if (result.success) {
+      this.saveData.gold = result.gold;
+      this.saveData.inventory = result.inventory;
+      this.updateHUD();
+      this.saveGame();
+      const unlockedCrops = getUnlockedCrops(this.saveData.totalEarned, this.saveData.unlockedCrops);
+      this.shopPanel.close();
+      this.shopPanel.open(
+        this.saveData.gold, this.saveData.totalEarned,
+        unlockedCrops.map(c => c.id), this.saveData.inventory,
+        (id) => this.handleBuy(id), (id) => this.handleSell(id)
+      );
+    }
+  }
+
+  private handleSell(cropId: string): void {
+    const result = EconomySystem.sellCrop(
+      cropId, this.saveData.gold, this.saveData.inventory, this.saveData.totalEarned
+    );
+    if (result.success) {
+      this.saveData.gold = result.gold;
+      this.saveData.inventory = result.inventory;
+      this.saveData.totalEarned = result.totalEarned;
+      this.checkCropUnlocks();
+      this.updateHUD();
+      this.saveGame();
+      const unlockedCrops = getUnlockedCrops(this.saveData.totalEarned, this.saveData.unlockedCrops);
+      this.shopPanel.close();
+      this.shopPanel.open(
+        this.saveData.gold, this.saveData.totalEarned,
+        unlockedCrops.map(c => c.id), this.saveData.inventory,
+        (id) => this.handleBuy(id), (id) => this.handleSell(id)
+      );
+    }
   }
 }
