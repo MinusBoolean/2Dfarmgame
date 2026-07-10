@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_CONFIG } from '../config';
-import { SaveData, TileData, ToolType } from '../types';
+import { SaveData, ToolType } from '../types';
 import { SaveSystem } from '../systems/SaveSystem';
 import { FarmTile } from '../entities/FarmTile';
 import { Player } from '../entities/Player';
@@ -13,6 +13,7 @@ export class FarmScene extends Phaser.Scene {
   private saveData!: SaveData;
   private currentTool: ToolType = ToolType.PLOW;
   private highlightedTile: FarmTile | null = null;
+  private interactionChanged: boolean = false;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: {
     up: Phaser.Input.Keyboard.Key;
@@ -168,8 +169,9 @@ export class FarmScene extends Phaser.Scene {
       }
     }
 
-    if (gridChanged) {
+    if (gridChanged || this.interactionChanged) {
       this.saveGame();
+      this.interactionChanged = false;
     }
   }
 
@@ -202,7 +204,7 @@ export class FarmScene extends Phaser.Scene {
             plantTime: null
           };
           tile.setTileData(this.saveData.farmGrid[tile.row][tile.col]);
-          this.saveGame();
+          this.interactionChanged = true;
         }
         break;
 
@@ -231,7 +233,7 @@ export class FarmScene extends Phaser.Scene {
           this.checkCropUnlocks();
           tile.setTileData(this.saveData.farmGrid[tile.row][tile.col]);
           this.updateHUD();
-          this.saveGame();
+          this.interactionChanged = true;
         }
         break;
     }
