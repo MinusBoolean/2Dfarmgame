@@ -65,6 +65,7 @@ export class BootScene extends Phaser.Scene {
 
   private startGame(): void {
     this.scene.start('FarmScene');
+    this.scene.launch('UIScene');
   }
 
   private createPlayerAnimations(): void {

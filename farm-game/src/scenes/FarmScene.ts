@@ -9,6 +9,9 @@ import { SeasonSystem } from '../systems/SeasonSystem';
 import { WeatherSystem } from '../systems/WeatherSystem';
 import { EconomySystem } from '../systems/EconomySystem';
 import { AudioSystem } from '../systems/AudioSystem';
+import { RatingSystem } from '../systems/RatingSystem';
+import { TutorialSystem } from '../systems/TutorialSystem';
+import { DailySummary } from '../ui/DailySummary';
 import { getCropById, getUnlockedCrops } from '../entities/CropConfig';
 
 type Direction = 'up' | 'down' | 'left' | 'right';
@@ -47,6 +50,14 @@ export class FarmScene extends Phaser.Scene {
 
   private hudTexts: Record<string, Phaser.GameObjects.Text> = {};
 
+  private dayHarvested: number = 0;
+  private dayWatered: number = 0;
+  private dayIncome: number = 0;
+  private matureTweens: Phaser.Tweens.Tween[] = [];
+  private overlayObjects: Phaser.GameObjects.GameObject[] = [];
+  private shopOpen: boolean = false;
+  private seedSelectOpen: boolean = false;
+
   constructor() {
     super({ key: 'FarmScene' });
   }
@@ -80,6 +91,8 @@ export class FarmScene extends Phaser.Scene {
     this.events.on('shutdown', () => {
       this.rainEmitter?.destroy();
       this.snowEmitter?.destroy();
+      this.matureTweens.forEach(t => t.destroy());
+      this.closeOverlay();
     });
   }
 
@@ -144,6 +157,7 @@ export class FarmScene extends Phaser.Scene {
     for (let row = 0; row < GAME_CONFIG.FARM_ROWS; row++) {
       for (let col = 0; col < GAME_CONFIG.FARM_COLS; col++) {
         this.updateTileVisual(row, col);
+        this.addMatureGlow(row, col, this.saveData.farmGrid[row][col]);
       }
     }
   }
@@ -389,27 +403,62 @@ export class FarmScene extends Phaser.Scene {
 
   private toggleShop(): void {
     if (this.isPaused) return;
+    if (this.shopOpen) {
+      this.closeOverlay();
+      this.shopOpen = false;
+      return;
+    }
+    this.closeOverlay();
+
     const season = SeasonSystem.getSeason(this.saveData.currentSeason);
     const unlocked = getUnlockedCrops(this.saveData.totalEarned);
-    if (unlocked.length === 0) {
-      this.showMessage('没有可购买的种子');
-      return;
-    }
-    // Buy first available seed for the current season
     const available = unlocked.filter(c => c.seasons.includes(season));
+
+    const { width, height } = this.scale;
+    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.6).setDepth(200).setScrollFactor(0);
+    const panelW = 280, panelH = 40 + available.length * 24;
+    const panel = this.add.rectangle(width / 2, height / 2, panelW, panelH, 0x222222).setDepth(201).setScrollFactor(0);
+    panel.setStrokeStyle(2, 0xffd700);
+
+    const title = this.add.text(width / 2, height / 2 - panelH / 2 + 16, '商店', {
+      fontSize: '16px', color: '#ffd700',
+    }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
+
+    this.overlayObjects = [overlay, panel, title];
+
     if (available.length === 0) {
-      this.showMessage('当季没有可种植的种子');
-      return;
-    }
-    const crop = available[0];
-    if (EconomySystem.buySeed(this.saveData, this.inventory, crop.id)) {
-      this.showMessage(`购买了 ${crop.name}种子 (-${crop.seedPrice}金币)`);
-      this.audio.playSfx('sfx_coin');
-      this.emitEvent('gold-changed', this.saveData.gold);
-      SaveSystem.save(this.saveData);
+      const t = this.add.text(width / 2, height / 2, '当季没有可购买的种子', {
+        fontSize: '13px', color: '#ffffff',
+      }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
+      this.overlayObjects.push(t);
     } else {
-      this.showMessage('金币不足或背包已满！');
+      available.forEach((crop, i) => {
+        const y = height / 2 - panelH / 2 + 40 + i * 24;
+        const label = `${crop.name}种子 - ${crop.seedPrice}金 | 卖价${crop.sellPrice}`;
+        const t = this.add.text(width / 2, y, label, {
+          fontSize: '13px', color: '#ffffff',
+        }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
+        t.setInteractive({ useHandCursor: true });
+        t.on('pointerdown', () => {
+          if (EconomySystem.buySeed(this.saveData, this.inventory, crop.id)) {
+            this.showMessage(`购买了 ${crop.name}种子 (-${crop.seedPrice}金币)`);
+            this.audio.playSfx('sfx_coin');
+            this.emitEvent('gold-changed', this.saveData.gold);
+            this.emitEvent('save-indicator');
+            SaveSystem.save(this.saveData);
+          } else {
+            this.showMessage('金币不足或背包已满！');
+          }
+          this.closeOverlay();
+          this.shopOpen = false;
+        });
+        t.on('pointerover', () => t.setColor('#ffd700'));
+        t.on('pointerout', () => t.setColor('#ffffff'));
+        this.overlayObjects.push(t);
+      });
     }
+
+    this.shopOpen = true;
   }
 
   private togglePause(): void {
@@ -417,6 +466,13 @@ export class FarmScene extends Phaser.Scene {
     if (this.isPaused) {
       this.showMessage('暂停中 (P继续)');
     }
+  }
+
+  private closeOverlay(): void {
+    this.overlayObjects.forEach(obj => obj.destroy());
+    this.overlayObjects = [];
+    this.shopOpen = false;
+    this.seedSelectOpen = false;
   }
 
   // ─── Movement ───────────────────────────────────────────────
@@ -485,6 +541,7 @@ export class FarmScene extends Phaser.Scene {
     }
 
     this.emitEvent('energy-changed', this.saveData.energy);
+    this.emitEvent('save-indicator');
     SaveSystem.save(this.saveData);
   }
 
@@ -519,9 +576,58 @@ export class FarmScene extends Phaser.Scene {
       return;
     }
 
-    // Use currently selected seed, or first available
+    // Show seed selector if multiple seeds available
+    if (seeds.length > 1 && !this.seedSelectOpen) {
+      this.showSeedSelector(tile, row, col, seeds);
+      return;
+    }
+
     const seedIdx = Math.min(this.selectedSeedIndex, seeds.length - 1);
     const seed = seeds[seedIdx];
+    this.plantSeed(tile, row, col, seed);
+  }
+
+  private showSeedSelector(tile: TileSaveData, row: number, col: number, seeds: InventoryItem[]): void {
+    this.closeOverlay();
+    const { width, height } = this.scale;
+    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.5).setDepth(200).setScrollFactor(0);
+    const panelH = 30 + seeds.length * 22;
+    const panel = this.add.rectangle(width / 2, height / 2, 220, panelH, 0x222222).setDepth(201).setScrollFactor(0);
+    panel.setStrokeStyle(2, 0x88cc88);
+
+    const title = this.add.text(width / 2, height / 2 - panelH / 2 + 12, '选择种子', {
+      fontSize: '14px', color: '#88cc88',
+    }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
+
+    this.overlayObjects = [overlay, panel, title];
+    this.seedSelectOpen = true;
+
+    seeds.forEach((seed, i) => {
+      const y = height / 2 - panelH / 2 + 32 + i * 22;
+      const crop = seed.cropId ? getCropById(seed.cropId) : null;
+      const season = SeasonSystem.getSeason(this.saveData.currentSeason);
+      const inSeason = crop ? crop.seasons.includes(season) : true;
+      const label = `${seed.name} x${seed.quantity}${inSeason ? '' : ' (非当季)'}`;
+
+      const t = this.add.text(width / 2, y, label, {
+        fontSize: '13px', color: inSeason ? '#ffffff' : '#666666',
+      }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
+
+      if (inSeason) {
+        t.setInteractive({ useHandCursor: true });
+        t.on('pointerdown', () => {
+          this.selectedSeedIndex = i;
+          this.closeOverlay();
+          this.plantSeed(tile, row, col, seed);
+        });
+        t.on('pointerover', () => t.setColor('#88cc88'));
+        t.on('pointerout', () => t.setColor('#ffffff'));
+      }
+      this.overlayObjects.push(t);
+    });
+  }
+
+  private plantSeed(tile: TileSaveData, row: number, col: number, seed: InventoryItem): void {
     const cropId = seed.cropId;
     if (!cropId) return;
 
@@ -550,6 +656,7 @@ export class FarmScene extends Phaser.Scene {
 
     this.saveData.energy = EnergySystem.consume(this.saveData.energy, cost);
     this.updateTileVisual(row, col);
+    this.addMatureGlow(row, col, tile);
     this.showParticles(row, col, 'dirt');
     this.audio.playSfx('sfx_plant');
     this.showMessage(`种下了 ${crop.name}`);
@@ -569,6 +676,7 @@ export class FarmScene extends Phaser.Scene {
     }
 
     tile.wateredToday = true;
+    this.dayWatered++;
     this.saveData.energy = EnergySystem.consume(this.saveData.energy, cost);
     this.updateTileVisual(row, col);
     this.showParticles(row, col, 'water');
@@ -609,6 +717,7 @@ export class FarmScene extends Phaser.Scene {
 
     this.saveData.energy = EnergySystem.consume(this.saveData.energy, cost);
     this.saveData.totalHarvested++;
+    this.dayHarvested++;
 
     tile.state = 'plowed';
     tile.cropId = undefined;
@@ -622,6 +731,7 @@ export class FarmScene extends Phaser.Scene {
     this.showMessage(`收获了 ${crop.name}${quality !== 'normal' ? ` (${quality})` : ''}！`);
 
     this.emitEvent('energy-changed', this.saveData.energy);
+    this.emitEvent('save-indicator');
     SaveSystem.save(this.saveData);
   }
 
@@ -653,22 +763,84 @@ export class FarmScene extends Phaser.Scene {
 
     const texture = textureMap[type] || 'particle_dirt';
 
+    let config: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig;
+    switch (type) {
+      case 'gold':
+        config = {
+          speed: { min: 40, max: 80 },
+          angle: { min: 240, max: 300 },
+          lifespan: 600,
+          quantity: 7,
+          scale: { start: 1.2, end: 0.2 },
+          alpha: { start: 1, end: 0 },
+          emitting: false,
+        };
+        break;
+      case 'water':
+        config = {
+          speed: { min: 30, max: 70 },
+          angle: { min: 220, max: 320 },
+          lifespan: 500,
+          quantity: 6,
+          scale: { start: 1, end: 0.3 },
+          alpha: { start: 0.8, end: 0 },
+          emitting: false,
+        };
+        break;
+      case 'dirt':
+      default:
+        config = {
+          speed: { min: 25, max: 55 },
+          angle: { min: 240, max: 300 },
+          lifespan: 450,
+          quantity: 4,
+          scale: { start: 1, end: 0.3 },
+          alpha: { start: 1, end: 0 },
+          emitting: false,
+        };
+        break;
+    }
+
     try {
-      const emitter = this.add.particles(x, y, texture, {
-        speed: { min: 20, max: 60 },
-        angle: { min: 0, max: 360 },
-        lifespan: 500,
-        quantity: 6,
-        scale: { start: 1, end: 0.3 },
-        alpha: { start: 1, end: 0 },
-        emitting: false,
-      });
+      const emitter = this.add.particles(x, y, texture, config);
       emitter.setDepth(15);
-      emitter.explode(6);
-      this.time.delayedCall(600, () => emitter.destroy());
+      emitter.explode(type === 'gold' ? 7 : type === 'water' ? 6 : 4);
+      this.time.delayedCall(700, () => emitter.destroy());
     } catch {
       // Particles may fail silently
     }
+  }
+
+  private addMatureGlow(row: number, col: number, tile: TileSaveData): void {
+    if (tile.state !== 'mature') return;
+    const TILE = GAME_CONFIG.TILE_SIZE;
+    const x = col * TILE + TILE / 2;
+    const y = row * TILE + TILE / 2;
+
+    const glow = this.add.rectangle(x, y, TILE, TILE, 0xffd700, 0.15).setDepth(2);
+    const tween = this.tweens.add({
+      targets: glow,
+      alpha: { from: 0.1, to: 0.35 },
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+    this.matureTweens.push(tween);
+
+    // Remove glow when tile is no longer mature
+    const checkInterval = this.time.addEvent({
+      delay: 500,
+      loop: true,
+      callback: () => {
+        const currentTile = this.saveData.farmGrid[row]?.[col];
+        if (!currentTile || currentTile.state !== 'mature') {
+          glow.destroy();
+          tween.destroy();
+          checkInterval.destroy();
+        }
+      },
+    });
   }
 
   // ─── Time System ────────────────────────────────────────────
@@ -694,6 +866,8 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private advanceDay(): void {
+    const prevGold = this.saveData.gold;
+
     const result = SeasonSystem.advanceDay(this.saveData.currentSeason, this.saveData.currentDay);
     this.saveData.currentSeason = result.season;
     this.saveData.currentDay = result.day;
@@ -710,6 +884,7 @@ export class FarmScene extends Phaser.Scene {
         GrowthSystem.processDay(tile, season);
         GrowthSystem.advanceGrowth(tile, 1);
         this.updateTileVisual(row, col);
+        this.addMatureGlow(row, col, tile);
       }
     }
 
@@ -717,6 +892,27 @@ export class FarmScene extends Phaser.Scene {
 
     this.settleShippingBin();
     this.checkCrows();
+
+    // Rating check
+    const newRating = RatingSystem.checkRating(this.saveData);
+    if (newRating !== this.saveData.farmRating) {
+      this.saveData.farmRating = newRating;
+      this.showMessage(`农场评级提升至 ${RatingSystem.getRatingName(newRating)}！`);
+    }
+
+    // Daily summary
+    const dayIncome = this.saveData.gold - prevGold;
+    DailySummary.show(this, {
+      gold: this.saveData.gold,
+      harvested: this.dayHarvested,
+      watered: this.dayWatered,
+      dayIncome,
+      day: result.day,
+    });
+
+    this.dayHarvested = 0;
+    this.dayWatered = 0;
+    this.dayIncome = 0;
 
     if (result.seasonChanged) {
       this.audio.playSfx('sfx_season');
@@ -729,6 +925,7 @@ export class FarmScene extends Phaser.Scene {
     this.emitEvent('day-changed', result.day, season);
     this.emitEvent('weather-changed', this.saveData.currentWeather);
     this.emitEvent('energy-changed', this.saveData.energy);
+    this.emitEvent('save-indicator');
     SaveSystem.save(this.saveData);
   }
 
@@ -869,5 +1066,10 @@ export class FarmScene extends Phaser.Scene {
     this.emitEvent('weather-changed', s.currentWeather);
     this.emitEvent('energy-changed', s.energy);
     this.emitEvent('season-changed', season);
+
+    const tutorialTask = TutorialSystem.getCurrentTask(s);
+    if (tutorialTask) {
+      this.showMessage(tutorialTask);
+    }
   }
 }
