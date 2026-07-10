@@ -21,7 +21,7 @@ export class FarmScene extends Phaser.Scene {
   private inventory!: InventorySystem;
   private audio!: AudioSystem;
 
-  private player!: Phaser.GameObjects.Rectangle;
+  private player!: Phaser.GameObjects.Image;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: {
     W: Phaser.Input.Keyboard.Key;
@@ -256,9 +256,9 @@ export class FarmScene extends Phaser.Scene {
 
   private createPlayer(): void {
     const TILE = GAME_CONFIG.TILE_SIZE;
-    this.player = this.add.rectangle(22 * TILE, 20 * TILE, TILE * 1.6, TILE * 1.6, 0x3366cc);
+    this.player = this.add.image(22 * TILE, 20 * TILE, 'player_sheet');
     this.player.setDepth(10);
-    this.player.setStrokeStyle(2, 0x1a3366);
+    this.player.setDisplaySize(TILE * 2, TILE * 2);
 
     this.physics.add.existing(this.player);
     const body = this.player.body as Phaser.Physics.Arcade.Body;
