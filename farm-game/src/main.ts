@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { BootScene } from './scenes/BootScene';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -10,11 +11,7 @@ const config: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
-  scene: {
-    create() {
-      this.add.text(400, 300, 'Farm Game', { fontSize: '32px', color: '#ffffff' }).setOrigin(0.5);
-    }
-  }
+  scene: [BootScene]
 };
 
 new Phaser.Game(config);
