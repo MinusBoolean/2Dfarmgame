@@ -1,0 +1,262 @@
+import Phaser from 'phaser';
+import { GAME_CONFIG } from '../config';
+import { SaveData, TileData, ToolType } from '../types';
+import { SaveSystem } from '../systems/SaveSystem';
+import { FarmTile } from '../entities/FarmTile';
+import { Player } from '../entities/Player';
+import { GrowthSystem } from '../systems/GrowthSystem';
+import { CROPS } from '../entities/CropConfig';
+
+export class FarmScene extends Phaser.Scene {
+  private tileGrid: FarmTile[][] = [];
+  private player!: Player;
+  private saveData!: SaveData;
+  private currentTool: ToolType = ToolType.PLOW;
+  private highlightedTile: FarmTile | null = null;
+  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private wasd!: {
+    up: Phaser.Input.Keyboard.Key;
+    down: Phaser.Input.Keyboard.Key;
+    left: Phaser.Input.Keyboard.Key;
+    right: Phaser.Input.Keyboard.Key;
+  };
+  private hudTexts!: {
+    goldText: Phaser.GameObjects.Text;
+    toolText: Phaser.GameObjects.Text;
+  };
+
+  constructor() {
+    super({ key: 'FarmScene' });
+  }
+
+  create(): void {
+    this.tileGrid = [];
+    this.saveData = SaveSystem.load() || SaveSystem.createDefaultSaveData();
+
+    this.drawGround();
+
+    for (let row = 0; row < GAME_CONFIG.GRID_ROWS; row++) {
+      this.tileGrid[row] = [];
+      for (let col = 0; col < GAME_CONFIG.GRID_COLS; col++) {
+        const tile = new FarmTile(this, row, col, this.saveData.farmGrid[row][col]);
+        tile.on('pointerdown', () => this.onTileClick(tile));
+        this.tileGrid[row][col] = tile;
+      }
+    }
+
+    const startX = GAME_CONFIG.GRID_OFFSET_X + GAME_CONFIG.TILE_SIZE * 1.5;
+    const startY = GAME_CONFIG.GRID_OFFSET_Y + GAME_CONFIG.TILE_SIZE * 1.5;
+    this.player = new Player(this, startX, startY);
+
+    this.cursors = this.input.keyboard!.createCursorKeys();
+    this.wasd = {
+      up: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+      down: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+      left: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+      right: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D)
+    };
+
+    this.input.keyboard!.on('keydown-ONE', () => this.setTool(ToolType.PLOW));
+    this.input.keyboard!.on('keydown-TWO', () => this.setTool(ToolType.SEED));
+    this.input.keyboard!.on('keydown-THREE', () => this.setTool(ToolType.HARVEST));
+    this.input.keyboard!.on('keydown-E', () => this.toggleShop());
+    this.input.keyboard!.on('keydown-SPACE', () => this.interactWithFacingTile());
+
+    this.createHUD();
+
+    this.updateTileVisibility();
+    this.updateHUD();
+  }
+
+  private drawGround(): void {
+    const graphics = this.add.graphics();
+    graphics.fillStyle(0x3a5c2f, 1);
+    graphics.fillRect(
+      GAME_CONFIG.GRID_OFFSET_X - 8,
+      GAME_CONFIG.GRID_OFFSET_Y - 8,
+      GAME_CONFIG.GRID_COLS * GAME_CONFIG.TILE_SIZE + 16,
+      GAME_CONFIG.GRID_ROWS * GAME_CONFIG.TILE_SIZE + 16
+    );
+
+    for (let row = 0; row < GAME_CONFIG.GRID_ROWS; row++) {
+      for (let col = 0; col < GAME_CONFIG.GRID_COLS; col++) {
+        const x = GAME_CONFIG.GRID_OFFSET_X + col * GAME_CONFIG.TILE_SIZE;
+        const y = GAME_CONFIG.GRID_OFFSET_Y + row * GAME_CONFIG.TILE_SIZE;
+        graphics.fillStyle(0x4a7c3f, 1);
+        graphics.fillRect(x + 1, y + 1, GAME_CONFIG.TILE_SIZE - 2, GAME_CONFIG.TILE_SIZE - 2);
+      }
+    }
+  }
+
+  private createHUD(): void {
+    this.add.rectangle(400, 20, 800, 40, GAME_CONFIG.COLORS.HUD_BG).setDepth(100).setScrollFactor(0);
+
+    this.hudTexts = {
+      goldText: this.add.text(16, 12, '', {
+        fontSize: '16px',
+        color: GAME_CONFIG.COLORS.GOLD_COLOR
+      }).setDepth(101).setScrollFactor(0),
+      toolText: this.add.text(784, 12, '', {
+        fontSize: '14px',
+        color: GAME_CONFIG.COLORS.HUD_TEXT
+      }).setDepth(101).setScrollFactor(0).setOrigin(1, 0)
+    };
+  }
+
+  private updateHUD(): void {
+    this.hudTexts.goldText.setText(`金币: ${this.saveData.gold}`);
+    const toolNames: Record<ToolType, string> = {
+      [ToolType.PLOW]: '翻地 [1]',
+      [ToolType.SEED]: '播种 [2]',
+      [ToolType.HARVEST]: '收获 [3]',
+      [ToolType.WATER]: '浇水'
+    };
+    this.hudTexts.toolText.setText(`工具: ${toolNames[this.currentTool]} | [E]商店 [空格]交互`);
+  }
+
+  private setTool(tool: ToolType): void {
+    this.currentTool = tool;
+    this.updateHUD();
+  }
+
+  private updateTileVisibility(): void {
+    for (let row = 0; row < GAME_CONFIG.GRID_ROWS; row++) {
+      for (let col = 0; col < GAME_CONFIG.GRID_COLS; col++) {
+        const tile = this.tileGrid[row][col];
+        const unlocked = tile.isUnlocked(this.saveData.unlockedTiles);
+        tile.setVisible(unlocked);
+        if (!unlocked) {
+          tile.disableInteractive();
+        } else {
+          tile.setInteractive();
+        }
+      }
+    }
+  }
+
+  update(time: number, delta: number): void {
+    this.player.update(delta, this.cursors, this.wasd);
+
+    const grid = this.tileGrid.map(row =>
+      row.map(tile => tile.tileData)
+    );
+    const newGrid = GrowthSystem.update(grid, time);
+
+    let gridChanged = false;
+    for (let row = 0; row < GAME_CONFIG.GRID_ROWS; row++) {
+      for (let col = 0; col < GAME_CONFIG.GRID_COLS; col++) {
+        if (newGrid[row][col].state !== this.tileGrid[row][col].tileData.state) {
+          this.tileGrid[row][col].setTileData(newGrid[row][col]);
+          gridChanged = true;
+        }
+      }
+    }
+
+    if (this.highlightedTile) {
+      this.highlightedTile.highlight(false);
+      this.highlightedTile = null;
+    }
+    const facing = this.player.getFacingTile();
+    if (
+      facing.row >= 0 && facing.row < GAME_CONFIG.GRID_ROWS &&
+      facing.col >= 0 && facing.col < GAME_CONFIG.GRID_COLS
+    ) {
+      const tile = this.tileGrid[facing.row][facing.col];
+      if (tile.visible) {
+        tile.highlight(true);
+        this.highlightedTile = tile;
+      }
+    }
+
+    if (gridChanged) {
+      this.saveGame();
+    }
+  }
+
+  private onTileClick(tile: FarmTile): void {
+    this.interactWithTile(tile);
+  }
+
+  private interactWithFacingTile(): void {
+    const facing = this.player.getFacingTile();
+    if (
+      facing.row >= 0 && facing.row < GAME_CONFIG.GRID_ROWS &&
+      facing.col >= 0 && facing.col < GAME_CONFIG.GRID_COLS
+    ) {
+      const tile = this.tileGrid[facing.row][facing.col];
+      if (tile.visible) {
+        this.interactWithTile(tile);
+      }
+    }
+  }
+
+  private interactWithTile(tile: FarmTile): void {
+    const data = tile.tileData;
+
+    switch (this.currentTool) {
+      case ToolType.PLOW:
+        if (data.state === 'empty') {
+          this.saveData.farmGrid[tile.row][tile.col] = {
+            state: 'plowed',
+            cropId: null,
+            plantTime: null
+          };
+          tile.setTileData(this.saveData.farmGrid[tile.row][tile.col]);
+          this.saveGame();
+        }
+        break;
+
+      case ToolType.SEED:
+        if (data.state === 'plowed') {
+          // TODO: will be connected to seed selection UI in Task 13
+        }
+        break;
+
+      case ToolType.HARVEST:
+        if (data.state === 'mature' && data.cropId) {
+          const { inventory, totalEarned, gold } = this.saveData;
+          const cropId = data.cropId;
+          const newInventory = { ...inventory };
+          newInventory[cropId] = (newInventory[cropId] || 0) + 1;
+
+          this.saveData.inventory = newInventory;
+          this.saveData.gold = gold;
+          this.saveData.totalEarned = totalEarned;
+          this.saveData.farmGrid[tile.row][tile.col] = {
+            state: 'empty',
+            cropId: null,
+            plantTime: null
+          };
+
+          this.checkCropUnlocks();
+          tile.setTileData(this.saveData.farmGrid[tile.row][tile.col]);
+          this.updateHUD();
+          this.saveGame();
+        }
+        break;
+    }
+  }
+
+  private checkCropUnlocks(): void {
+    for (const crop of CROPS) {
+      if (crop.unlockGold <= this.saveData.totalEarned &&
+          !this.saveData.unlockedCrops.includes(crop.id)) {
+        this.saveData.unlockedCrops.push(crop.id);
+      }
+    }
+  }
+
+  private saveGame(): void {
+    for (let row = 0; row < GAME_CONFIG.GRID_ROWS; row++) {
+      for (let col = 0; col < GAME_CONFIG.GRID_COLS; col++) {
+        this.saveData.farmGrid[row][col] = { ...this.tileGrid[row][col].tileData };
+      }
+    }
+    SaveSystem.save(this.saveData);
+  }
+
+  private toggleShop(): void {
+    // Connected to ShopPanel in Task 12
+    console.log('Shop toggled');
+  }
+}
