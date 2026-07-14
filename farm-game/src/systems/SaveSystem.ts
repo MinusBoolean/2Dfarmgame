@@ -42,6 +42,17 @@ export class SaveSystem {
         timeSpeed: 1,
         smartToolSwitch: true,
       },
+      mineData: {
+        currentFloor: 0,
+        floors: Array.from({ length: 5 }, () => ({
+          tiles: [],
+          discovered: false,
+        })),
+      },
+      quests: [],
+      completedQuests: 0,
+      collectedItems: [],
+      pickaxeLevel: 1,
     };
   }
 

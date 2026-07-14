@@ -65,4 +65,60 @@ export interface SaveData {
     timeSpeed: number;
     smartToolSwitch: boolean;
   };
+  mineData: {
+    currentFloor: number;
+    floors: MineFloorData[];
+  };
+  quests: QuestData[];
+  completedQuests: number;
+  collectedItems: string[];
+  pickaxeLevel: number;
+}
+
+// ─── V2 Types ────────────────────────────────────────
+
+export type MineTileType = 'empty' | 'rock' | 'ore' | 'stairs' | 'collectible';
+export type OreType = 'copper' | 'iron' | 'gold';
+
+export interface MineTileData {
+  type: MineTileType;
+  oreType?: OreType;
+  collectibleType?: string;
+  hitsRemaining: number;
+}
+
+export interface MineFloorData {
+  tiles: MineTileData[][];
+  discovered: boolean;
+}
+
+export interface QuestTarget {
+  type: 'harvest' | 'mine' | 'craft' | 'collect';
+  id?: string;
+  count: number;
+}
+
+export interface QuestReward {
+  gold: number;
+  ratingPoints: number;
+}
+
+export interface QuestData {
+  id: string;
+  title: string;
+  description: string;
+  target: QuestTarget;
+  reward: QuestReward;
+  progress: number;
+  accepted: boolean;
+  completed: boolean;
+}
+
+export interface WorkshopRecipe {
+  id: string;
+  name: string;
+  description: string;
+  materials: { itemId: string; quantity: number }[];
+  goldCost: number;
+  result: { type: 'tool_upgrade' | 'item'; tool?: 'hoe' | 'wateringCan' | 'pickaxe'; itemId?: string; quantity?: number };
 }
