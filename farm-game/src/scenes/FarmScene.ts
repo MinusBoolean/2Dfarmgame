@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_CONFIG } from '../config';
-import { SaveData, TileSaveData, ToolType, Weather, Season, InventoryItem } from '../types';
+import { SaveData, TileSaveData, ToolType, Weather, Season, InventoryItem, PathType } from '../types';
 import { SaveSystem } from '../systems/SaveSystem';
 import { ShippingBinSystem } from '../systems/ShippingBinSystem';
 import { InventorySystem } from '../systems/InventorySystem';
@@ -15,7 +15,10 @@ import { TutorialSystem } from '../systems/TutorialSystem';
 import { DailySummary } from '../ui/DailySummary';
 import { WorkshopPanel } from '../ui/WorkshopPanel';
 import { BulletinBoard } from '../ui/BulletinBoard';
+import { ShippingBinPanel } from '../ui/ShippingBinPanel';
 import { QuestSystem } from '../systems/QuestSystem';
+import { ForageSystem } from '../systems/ForageSystem';
+import { FruitTreeSystem } from '../systems/FruitTreeSystem';
 import { getCropById, getUnlockedCrops } from '../entities/CropConfig';
 
 type Direction = 'up' | 'down' | 'left' | 'right';
@@ -63,6 +66,12 @@ export class FarmScene extends Phaser.Scene {
   private seedSelectOpen: boolean = false;
   private workshopPanel!: WorkshopPanel;
   private bulletinBoard!: BulletinBoard;
+  private shippingBinPanel!: ShippingBinPanel;
+  private forageGraphics: Phaser.GameObjects.Graphics[] = [];
+  private treeGraphics: Phaser.GameObjects.Graphics[] = [];
+  private pathSelectOpen: boolean = false;
+  private selectedPathType: PathType = 'stone';
+  private placingPath: boolean = false;
 
   constructor() {
     super({ key: 'FarmScene' });
@@ -92,6 +101,7 @@ export class FarmScene extends Phaser.Scene {
       this.emitEvent('save-indicator');
       SaveSystem.save(this.saveData);
     });
+    this.shippingBinPanel = new ShippingBinPanel(this, this.saveData, this.inventory);
 
     if (this.saveData.tomorrowWeather === 'sunny' && this.saveData.currentDay === 1 && this.saveData.currentSeason === 0) {
       this.saveData.tomorrowWeather = WeatherSystem.generateWeather(
@@ -105,6 +115,9 @@ export class FarmScene extends Phaser.Scene {
     );
 
     this.renderAllTiles();
+    this.renderForageItems();
+    this.renderFruitTrees();
+    this.renderPaths();
     this.emitAllEvents();
 
     this.events.on('shutdown', () => {
@@ -121,6 +134,7 @@ export class FarmScene extends Phaser.Scene {
     this.updateWeatherEffects();
     this.updateMessage(delta);
     this.updateHud();
+    this.checkForagePickup();
   }
 
   // ─── Farm Grid ──────────────────────────────────────────────
@@ -161,6 +175,21 @@ export class FarmScene extends Phaser.Scene {
           color = 0xA0522D;
         }
 
+        // Pond entrance (east side)
+        if (row >= 15 && row < 18 && col >= 58 && col < 62) {
+          color = 0x4a6fb5;
+        }
+
+        // Greenhouse entrance (northwest)
+        if (row >= 5 && row < 8 && col >= 3 && col < 7) {
+          color = 0x88ccff;
+        }
+
+        // Shipping bin (southwest)
+        if (row >= 40 && row < 42 && col >= 5 && col < 8) {
+          color = 0xffd700;
+        }
+
         this.baseMapGraphics.fillStyle(color);
         this.baseMapGraphics.fillRect(x, y, TILE, TILE);
       }
@@ -179,6 +208,9 @@ export class FarmScene extends Phaser.Scene {
     this.add.text(32 * TILE, 46 * TILE, '矿洞入口', { fontSize: '10px', color: '#ffd700' }).setOrigin(0.5).setDepth(5);
     this.add.text(30 * TILE, 36 * TILE, '工坊', { fontSize: '10px', color: '#ffd700' }).setOrigin(0.5).setDepth(5);
     this.add.text(6 * TILE, 11 * TILE, '公告板', { fontSize: '10px', color: '#ffd700' }).setOrigin(0.5).setDepth(5);
+    this.add.text(60 * TILE, 16 * TILE, '池塘', { fontSize: '10px', color: '#4a6fb5' }).setOrigin(0.5).setDepth(5);
+    this.add.text(5 * TILE, 6 * TILE, '温室', { fontSize: '10px', color: '#88ccff' }).setOrigin(0.5).setDepth(5);
+    this.add.text(6 * TILE, 41 * TILE, '出货箱', { fontSize: '10px', color: '#ffd700' }).setOrigin(0.5).setDepth(5);
 
     // Per-tile overlay graphics
     this.tileGraphics = [];
@@ -418,6 +450,18 @@ export class FarmScene extends Phaser.Scene {
         this.tryEnterMine();
         return;
       }
+      if (row >= 15 && row < 18 && col >= 58 && col < 62) {
+        this.enterPond();
+        return;
+      }
+      if (row >= 5 && row < 8 && col >= 3 && col < 7) {
+        this.enterGreenhouse();
+        return;
+      }
+      if (row >= 40 && row < 42 && col >= 5 && col < 8) {
+        this.toggleShippingBin();
+        return;
+      }
       this.toggleShop();
     });
     this.input.keyboard.on('keydown-W', () => {
@@ -430,7 +474,7 @@ export class FarmScene extends Phaser.Scene {
         this.bulletinBoard.toggle();
       }
     });
-    this.input.keyboard.on('keydown-P', () => this.togglePause());
+    this.input.keyboard.on('keydown-P', () => this.togglePathMode());
     this.input.keyboard.on('keydown-Q', () => this.cycleSeed());
     this.input.keyboard.on('keydown-H', () => this.tryHarvest());
   }
@@ -470,9 +514,13 @@ export class FarmScene extends Phaser.Scene {
     const unlocked = getUnlockedCrops(this.saveData.totalEarned);
     const available = unlocked.filter(c => c.seasons.includes(season));
 
+    // Add fruit tree saplings
+    const trees = FruitTreeSystem.TREES;
+
     const { width, height } = this.scale;
+    const totalItems = available.length + trees.length;
+    const panelW = 280, panelH = 40 + totalItems * 24;
     const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.6).setDepth(200).setScrollFactor(0);
-    const panelW = 280, panelH = 40 + available.length * 24;
     const panel = this.add.rectangle(width / 2, height / 2, panelW, panelH, 0x222222).setDepth(201).setScrollFactor(0);
     panel.setStrokeStyle(2, 0xffd700);
 
@@ -482,12 +530,13 @@ export class FarmScene extends Phaser.Scene {
 
     this.overlayObjects = [overlay, panel, title];
 
-    if (available.length === 0) {
+    if (totalItems === 0) {
       const t = this.add.text(width / 2, height / 2, '当季没有可购买的种子', {
         fontSize: '13px', color: '#ffffff',
       }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
       this.overlayObjects.push(t);
     } else {
+      // Seeds
       available.forEach((crop, i) => {
         const y = height / 2 - panelH / 2 + 40 + i * 24;
         const label = `${crop.name}种子 - ${crop.seedPrice}金 | 卖价${crop.sellPrice}`;
@@ -510,6 +559,42 @@ export class FarmScene extends Phaser.Scene {
         });
         t.on('pointerover', () => t.setColor('#ffd700'));
         t.on('pointerout', () => t.setColor('#ffffff'));
+        this.overlayObjects.push(t);
+      });
+
+      // Fruit tree saplings
+      trees.forEach((tree, i) => {
+        const y = height / 2 - panelH / 2 + 40 + (available.length + i) * 24;
+        const label = `${tree.name}苗 - ${tree.price}金 | 产${tree.fruitName}(${tree.fruitSellPrice}G)`;
+        const t = this.add.text(width / 2, y, label, {
+          fontSize: '13px', color: '#88cc88',
+        }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
+        t.setInteractive({ useHandCursor: true });
+        t.on('pointerdown', () => {
+          if (this.saveData.gold >= tree.price) {
+            if (this.inventory.isFull()) {
+              this.showMessage('背包已满！');
+              return;
+            }
+            this.saveData.gold -= tree.price;
+            this.inventory.addItem({
+              id: `sapling_${tree.id}`,
+              name: `${tree.name}苗`,
+              type: 'crop',
+              quantity: 1,
+            });
+            this.showMessage(`购买了 ${tree.name}苗 (-${tree.price}金币)`);
+            this.audio.playSfx('sfx_coin');
+            this.emitEvent('gold-changed', this.saveData.gold);
+            SaveSystem.save(this.saveData);
+          } else {
+            this.showMessage('金币不足！');
+          }
+          this.closeOverlay();
+          this.shopOpen = false;
+        });
+        t.on('pointerover', () => t.setColor('#ffd700'));
+        t.on('pointerout', () => t.setColor('#88cc88'));
         this.overlayObjects.push(t);
       });
     }
@@ -539,6 +624,220 @@ export class FarmScene extends Phaser.Scene {
   private isNearBulletinBoard(): boolean {
     const { row, col } = this.getFacingTile();
     return row >= 9 && row < 13 && col >= 4 && col < 9;
+  }
+
+  // ─── Scene Transitions ─────────────────────────────────────
+
+  private enterPond(): void {
+    SaveSystem.save(this.saveData);
+    this.scene.start('PondScene', { saveData: this.saveData });
+  }
+
+  private enterGreenhouse(): void {
+    if (!this.saveData.greenhouseUnlocked) {
+      this.showMessage('温室尚未解锁！');
+      return;
+    }
+    SaveSystem.save(this.saveData);
+    this.scene.start('GreenhouseScene', { saveData: this.saveData });
+  }
+
+  private toggleShippingBin(): void {
+    this.shippingBinPanel.updateData(this.saveData, this.inventory);
+    this.shippingBinPanel.toggle();
+  }
+
+  // ─── Forage System ─────────────────────────────────────────
+
+  private renderForageItems(): void {
+    this.forageGraphics.forEach(g => g.destroy());
+    this.forageGraphics = [];
+
+    const TILE = GAME_CONFIG.TILE_SIZE;
+    for (const item of this.saveData.foragePositions) {
+      const g = this.add.graphics();
+      g.setDepth(3);
+      const x = item.col * TILE + TILE / 2;
+      const y = item.row * TILE + TILE / 2;
+
+      const forage = ForageSystem.getItemById(item.id);
+      const color = forage ? this.getForageColor(forage.id) : 0x88cc88;
+
+      g.fillStyle(color, 0.9);
+      g.fillCircle(x, y, 4);
+      g.lineStyle(1, 0x2d5a1a, 0.8);
+      g.lineBetween(x, y + 4, x, y + TILE / 2);
+
+      this.forageGraphics.push(g);
+    }
+  }
+
+  private getForageColor(id: string): number {
+    const colorMap: Record<string, number> = {
+      wildflower: 0xff69b4,
+      mushroom: 0x8b4513,
+      shell: 0xffd700,
+      pinecone: 0x8b6914,
+      berry: 0xff1493,
+      orchid: 0xda70d6,
+    };
+    return colorMap[id] || 0x88cc88;
+  }
+
+  private checkForagePickup(): void {
+    const TILE = GAME_CONFIG.TILE_SIZE;
+    const playerRow = Math.floor(this.player.y / TILE);
+    const playerCol = Math.floor(this.player.x / TILE);
+
+    const pickupRange = 1;
+    const toRemove: number[] = [];
+
+    this.saveData.foragePositions.forEach((item, index) => {
+      if (Math.abs(item.row - playerRow) <= pickupRange && Math.abs(item.col - playerCol) <= pickupRange) {
+        const forage = ForageSystem.getItemById(item.id);
+        if (forage) {
+          const forageItem: InventoryItem = {
+            id: `forage_${forage.id}`,
+            name: forage.name,
+            type: 'crop',
+            quantity: 1,
+          };
+          if (this.inventory.addItem(forageItem)) {
+            this.showMessage(`捡到了 ${forage.name}！`);
+            this.audio.playSfx('sfx_click');
+            toRemove.push(index);
+          }
+        }
+      }
+    });
+
+    if (toRemove.length > 0) {
+      for (let i = toRemove.length - 1; i >= 0; i--) {
+        this.saveData.foragePositions.splice(toRemove[i], 1);
+      }
+      this.renderForageItems();
+      SaveSystem.save(this.saveData);
+    }
+  }
+
+  // ─── Fruit Tree System ─────────────────────────────────────
+
+  private renderFruitTrees(): void {
+    this.treeGraphics.forEach(g => g.destroy());
+    this.treeGraphics = [];
+
+    const TILE = GAME_CONFIG.TILE_SIZE;
+    for (const tree of this.saveData.fruitTrees) {
+      const g = this.add.graphics();
+      g.setDepth(3);
+      const x = tree.col * TILE + TILE / 2;
+      const y = tree.row * TILE + TILE / 2;
+
+      const isMature = FruitTreeSystem.isMature(tree, this.saveData.currentDay);
+      const color = isMature ? 0x228b22 : 0x8b6914;
+
+      // Trunk
+      g.fillStyle(0x8b4513, 0.9);
+      g.fillRect(x - 2, y - 2, 4, TILE);
+
+      // Canopy
+      g.fillStyle(color, 0.9);
+      g.fillCircle(x, y - TILE / 2, TILE * 0.8);
+
+      // Fruit indicator if mature and can harvest
+      if (isMature) {
+        const treeData = FruitTreeSystem.getTreeById(tree.id);
+        if (treeData && FruitTreeSystem.canHarvest(tree, this.saveData.currentDay, SeasonSystem.getSeason(this.saveData.currentSeason))) {
+          g.fillStyle(0xff4444, 0.9);
+          g.fillCircle(x - 3, y - TILE / 2 - 2, 2);
+          g.fillCircle(x + 3, y - TILE / 2 + 2, 2);
+        }
+      }
+
+      this.treeGraphics.push(g);
+    }
+  }
+
+  // ─── Path System ───────────────────────────────────────────
+
+  private renderPaths(): void {
+    const TILE = GAME_CONFIG.TILE_SIZE;
+    for (const path of this.saveData.paths) {
+      const g = this.add.graphics();
+      g.setDepth(0);
+      const x = path.col * TILE;
+      const y = path.row * TILE;
+
+      let color: number;
+      switch (path.type) {
+        case 'stone': color = 0x808080; break;
+        case 'wood': color = 0x8b6914; break;
+        case 'grass': color = 0x6db856; break;
+        default: color = 0x808080;
+      }
+
+      g.fillStyle(color, 0.7);
+      g.fillRect(x + 1, y + 1, TILE - 2, TILE - 2);
+    }
+  }
+
+  private togglePathMode(): void {
+    if (this.pathSelectOpen) {
+      this.closeOverlay();
+      this.pathSelectOpen = false;
+      this.placingPath = false;
+      return;
+    }
+
+    this.closeOverlay();
+    const { width, height } = this.scale;
+    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.5).setDepth(200).setScrollFactor(0);
+    const panelH = 120;
+    const panel = this.add.rectangle(width / 2, height / 2, 200, panelH, 0x222222).setDepth(201).setScrollFactor(0);
+    panel.setStrokeStyle(2, 0x88cc88);
+
+    const title = this.add.text(width / 2, height / 2 - panelH / 2 + 12, '选择路径类型', {
+      fontSize: '14px', color: '#88cc88',
+    }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
+
+    this.overlayObjects = [overlay, panel, title];
+    this.pathSelectOpen = true;
+
+    const pathTypes: { type: PathType; name: string; color: string }[] = [
+      { type: 'stone', name: '石板路', color: '#808080' },
+      { type: 'wood', name: '木板路', color: '#8b6914' },
+      { type: 'grass', name: '草径', color: '#6db856' },
+    ];
+
+    pathTypes.forEach((p, i) => {
+      const y = height / 2 - panelH / 2 + 36 + i * 24;
+      const t = this.add.text(width / 2, y, p.name, {
+        fontSize: '13px', color: p.color,
+      }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
+
+      t.setInteractive({ useHandCursor: true });
+      t.on('pointerdown', () => {
+        this.selectedPathType = p.type;
+        this.placingPath = true;
+        this.closeOverlay();
+        this.pathSelectOpen = false;
+        this.showMessage(`铺设${p.name} — 点击地块放置，P退出`);
+      });
+      t.on('pointerover', () => t.setColor('#ffd700'));
+      t.on('pointerout', () => t.setColor(p.color));
+      this.overlayObjects.push(t);
+    });
+  }
+
+  private placePath(row: number, col: number): void {
+    const existing = this.saveData.paths.findIndex(p => p.row === row && p.col === col);
+    if (existing !== -1) {
+      this.saveData.paths[existing].type = this.selectedPathType;
+    } else {
+      this.saveData.paths.push({ row, col, type: this.selectedPathType });
+    }
+    this.renderPaths();
+    SaveSystem.save(this.saveData);
   }
 
   private closeOverlay(): void {
@@ -598,6 +897,12 @@ export class FarmScene extends Phaser.Scene {
     if (this.isPaused) return;
     const { row, col } = this.getFacingTile();
     if (row < 0 || row >= GAME_CONFIG.FARM_ROWS || col < 0 || col >= GAME_CONFIG.FARM_COLS) return;
+
+    // Path placement mode
+    if (this.placingPath) {
+      this.placePath(row, col);
+      return;
+    }
 
     const tile = this.saveData.farmGrid[row][col];
 
@@ -965,6 +1270,9 @@ export class FarmScene extends Phaser.Scene {
 
     this.settleShippingBin();
     this.checkCrows();
+
+    // Generate daily forage items
+    this.saveData.foragePositions = ForageSystem.generateDailyForage(season);
 
     // Generate daily quests
     QuestSystem.generateDailyQuests(this.saveData);

@@ -3,6 +3,8 @@ import { BootScene } from './scenes/BootScene';
 import { FarmScene } from './scenes/FarmScene';
 import { UIScene } from './scenes/UIScene';
 import { MineScene } from './scenes/MineScene';
+import { PondScene } from './scenes/PondScene';
+import { GreenhouseScene } from './scenes/GreenhouseScene';
 import { GAME_CONFIG } from './config';
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -21,7 +23,7 @@ const config: Phaser.Types.Core.GameConfig = {
     default: 'arcade',
     arcade: { debug: false },
   },
-  scene: [BootScene, FarmScene, UIScene, MineScene],
+  scene: [BootScene, FarmScene, UIScene, MineScene, PondScene, GreenhouseScene],
 };
 
 new Phaser.Game(config);
