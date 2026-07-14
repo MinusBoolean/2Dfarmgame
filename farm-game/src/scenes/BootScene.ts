@@ -53,6 +53,11 @@ export class BootScene extends Phaser.Scene {
       this.load.audio('sfx_click', ['assets/audio/sfx/click.mp3']);
       this.load.audio('sfx_rain', ['assets/audio/sfx/rain.mp3']);
       this.load.audio('sfx_season', ['assets/audio/sfx/season.mp3']);
+
+      // Mine audio
+      this.load.audio('sfx_mine_hit', ['assets/audio/sfx/mine_hit.mp3']);
+      this.load.audio('sfx_ore_break', ['assets/audio/sfx/ore_break.mp3']);
+      this.load.audio('bgm_mine', ['assets/audio/bgm/mine.mp3']);
     } catch {
       // Audio files may not exist yet
     }
