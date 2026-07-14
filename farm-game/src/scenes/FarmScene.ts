@@ -48,6 +48,7 @@ export class FarmScene extends Phaser.Scene {
 
   private tileGraphics: Phaser.GameObjects.Graphics[][] = [];
   private baseMapGraphics!: Phaser.GameObjects.Graphics;
+  private tileOverlays: Phaser.GameObjects.TileSprite[][] = [];
 
   private rainEmitter?: Phaser.GameObjects.Particles.ParticleEmitter;
   private snowEmitter?: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -147,77 +148,68 @@ export class FarmScene extends Phaser.Scene {
 
   private createFarmGrid(): void {
     const TILE = GAME_CONFIG.TILE_SIZE;
+    const MAP_W = GAME_CONFIG.FARM_COLS * TILE;
+    const MAP_H = GAME_CONFIG.FARM_ROWS * TILE;
 
-    // Farm tiles background
-    const farmBg = this.add.image(
-      GAME_CONFIG.FARM_COLS * TILE / 2,
-      GAME_CONFIG.FARM_ROWS * TILE / 2,
-      'farm_tiles'
-    );
-    farmBg.setDepth(-1);
-    farmBg.setDisplaySize(GAME_CONFIG.FARM_COLS * TILE, GAME_CONFIG.FARM_ROWS * TILE);
+    // Grass background (entire farm)
+    const grassBg = this.add.tileSprite(0, 0, MAP_W, MAP_H, 'tile_grass');
+    grassBg.setOrigin(0, 0);
+    grassBg.setDepth(-1);
+
+    // Farm soil area (rows 10-30, cols 10-35)
+    const soilX = 10 * TILE;
+    const soilY = 10 * TILE;
+    const soilW = 25 * TILE;
+    const soilH = 20 * TILE;
+    const soilBg = this.add.tileSprite(soilX, soilY, soilW, soilH, 'tile_dirt');
+    soilBg.setOrigin(0, 0);
+    soilBg.setDepth(0);
+
+    // Stone path border above soil (row 9, cols 10-35)
+    const stoneBorder = this.add.tileSprite(10 * TILE, 9 * TILE, 26 * TILE, TILE, 'tile_stone');
+    stoneBorder.setOrigin(0, 0);
+    stoneBorder.setDepth(0);
+
+    // Mine entrance (rows 45-48, cols 30-35)
+    const mineEntrance = this.add.tileSprite(30 * TILE, 45 * TILE, 5 * TILE, 3 * TILE, 'tile_mine_rock');
+    mineEntrance.setOrigin(0, 0);
+    mineEntrance.setDepth(0);
+
+    // Workshop (rows 35-38, cols 28-32)
+    const workshop = this.add.tileSprite(28 * TILE, 35 * TILE, 4 * TILE, 3 * TILE, 'tile_wood');
+    workshop.setOrigin(0, 0);
+    workshop.setDepth(0);
+
+    // Bulletin board (rows 10-12, cols 5-8)
+    const bulletin = this.add.tileSprite(5 * TILE, 10 * TILE, 3 * TILE, 2 * TILE, 'tile_wood');
+    bulletin.setOrigin(0, 0);
+    bulletin.setDepth(0);
+
+    // Pond entrance (rows 15-18, cols 58-62)
+    const pondEntrance = this.add.tileSprite(58 * TILE, 15 * TILE, 4 * TILE, 3 * TILE, 'tile_water');
+    pondEntrance.setOrigin(0, 0);
+    pondEntrance.setDepth(0);
+
+    // Greenhouse entrance (rows 5-8, cols 3-7)
+    const greenhouseEntrance = this.add.tileSprite(3 * TILE, 5 * TILE, 4 * TILE, 3 * TILE, 'tile_grass');
+    greenhouseEntrance.setOrigin(0, 0);
+    greenhouseEntrance.setDepth(0);
+
+    // Shipping bin (rows 40-42, cols 5-8)
+    const shippingBin = this.add.tileSprite(5 * TILE, 40 * TILE, 3 * TILE, 2 * TILE, 'tile_wood');
+    shippingBin.setOrigin(0, 0);
+    shippingBin.setDepth(0);
 
     this.baseMapGraphics = this.add.graphics();
     this.baseMapGraphics.setDepth(0);
 
-    for (let row = 0; row < GAME_CONFIG.FARM_ROWS; row++) {
-      for (let col = 0; col < GAME_CONFIG.FARM_COLS; col++) {
-        const x = col * TILE;
-        const y = row * TILE;
-        let color = 0x4a8c3f;
-
-        if (row >= 10 && row < 30 && col >= 10 && col < 35) {
-          color = 0x8b6914;
-        }
-        if (row === 9 && col >= 10 && col <= 35) {
-          color = 0x808080;
-        }
-        if (row >= 5 && row < 9 && col >= 3 && col < 8) {
-          color = 0xa67c2e;
-        }
-
-        // Mine entrance
-        if (row >= 45 && row < 48 && col >= 30 && col < 35) {
-          color = 0x444444;
-        }
-
-        // Workshop
-        if (row >= 35 && row < 38 && col >= 28 && col < 32) {
-          color = 0x8B4513;
-        }
-
-        // Bulletin board
-        if (row >= 10 && row < 12 && col >= 5 && col < 8) {
-          color = 0xA0522D;
-        }
-
-        // Pond entrance (east side)
-        if (row >= 15 && row < 18 && col >= 58 && col < 62) {
-          color = 0x4a6fb5;
-        }
-
-        // Greenhouse entrance (northwest)
-        if (row >= 5 && row < 8 && col >= 3 && col < 7) {
-          color = 0x88ccff;
-        }
-
-        // Shipping bin (southwest)
-        if (row >= 40 && row < 42 && col >= 5 && col < 8) {
-          color = 0xffd700;
-        }
-
-        this.baseMapGraphics.fillStyle(color);
-        this.baseMapGraphics.fillRect(x, y, TILE, TILE);
-      }
-    }
-
     // Grid lines
     this.baseMapGraphics.lineStyle(1, 0x000000, 0.08);
     for (let row = 0; row <= GAME_CONFIG.FARM_ROWS; row++) {
-      this.baseMapGraphics.lineBetween(0, row * TILE, GAME_CONFIG.FARM_COLS * TILE, row * TILE);
+      this.baseMapGraphics.lineBetween(0, row * TILE, MAP_W, row * TILE);
     }
     for (let col = 0; col <= GAME_CONFIG.FARM_COLS; col++) {
-      this.baseMapGraphics.lineBetween(col * TILE, 0, col * TILE, GAME_CONFIG.FARM_ROWS * TILE);
+      this.baseMapGraphics.lineBetween(col * TILE, 0, col * TILE, MAP_H);
     }
 
     // Building labels
@@ -228,13 +220,25 @@ export class FarmScene extends Phaser.Scene {
     this.add.text(5 * TILE, 6 * TILE, '温室', { fontSize: '10px', color: '#88ccff' }).setOrigin(0.5).setDepth(5);
     this.add.text(6 * TILE, 41 * TILE, '出货箱', { fontSize: '10px', color: '#ffd700' }).setOrigin(0.5).setDepth(5);
 
-    // Per-tile overlay graphics
+    // Per-tile overlay tileSprites for state changes
+    this.tileOverlays = [];
+    for (let row = 0; row < GAME_CONFIG.FARM_ROWS; row++) {
+      this.tileOverlays[row] = [];
+      for (let col = 0; col < GAME_CONFIG.FARM_COLS; col++) {
+        this.tileOverlays[row][col] = this.add.tileSprite(col * TILE, row * TILE, TILE, TILE, 'tile_plowed');
+        this.tileOverlays[row][col].setOrigin(0, 0);
+        this.tileOverlays[row][col].setDepth(1);
+        this.tileOverlays[row][col].setVisible(false);
+      }
+    }
+
+    // Per-tile overlay graphics for crop indicators
     this.tileGraphics = [];
     for (let row = 0; row < GAME_CONFIG.FARM_ROWS; row++) {
       this.tileGraphics[row] = [];
       for (let col = 0; col < GAME_CONFIG.FARM_COLS; col++) {
         const g = this.add.graphics();
-        g.setDepth(1);
+        g.setDepth(2);
         this.tileGraphics[row][col] = g;
       }
     }
@@ -266,6 +270,7 @@ export class FarmScene extends Phaser.Scene {
   private updateTileVisual(row: number, col: number): void {
     const tile = this.saveData.farmGrid[row]?.[col];
     const g = this.tileGraphics[row]?.[col];
+    const overlay = this.tileOverlays[row]?.[col];
     if (!tile || !g) return;
 
     const TILE = GAME_CONFIG.TILE_SIZE;
@@ -273,22 +278,32 @@ export class FarmScene extends Phaser.Scene {
     const y = row * TILE;
 
     g.clear();
+    if (overlay) overlay.setVisible(false);
 
-    // Only draw overlays for non-empty tiles
     if (tile.state === 'empty') return;
 
-    let bgColor: number;
-    switch (tile.state) {
-      case 'plowed': bgColor = 0x7a5a10; break;
-      case 'planted':
-      case 'growing': bgColor = tile.wateredToday ? 0x5a3a0a : 0x7a5a10; break;
-      case 'mature': bgColor = 0x2d8a2d; break;
-      case 'dead': bgColor = 0x606060; break;
-      default: return;
+    // Show texture overlay for soil states
+    if (overlay) {
+      switch (tile.state) {
+        case 'plowed':
+          overlay.setTexture('tile_plowed');
+          overlay.setVisible(true);
+          break;
+        case 'planted':
+        case 'growing':
+          overlay.setTexture(tile.wateredToday ? 'tile_watered' : 'tile_plowed');
+          overlay.setVisible(true);
+          break;
+        case 'mature':
+          overlay.setTexture('tile_watered');
+          overlay.setVisible(true);
+          break;
+        case 'dead':
+          overlay.setTexture('tile_plowed');
+          overlay.setVisible(true);
+          break;
+      }
     }
-
-    g.fillStyle(bgColor, 0.7);
-    g.fillRect(x + 1, y + 1, TILE - 2, TILE - 2);
 
     // Draw crop indicator
     if (tile.cropId && (tile.state === 'planted' || tile.state === 'growing' || tile.state === 'mature')) {
@@ -930,24 +945,29 @@ export class FarmScene extends Phaser.Scene {
 
   // ─── Path System ───────────────────────────────────────────
 
+  private pathObjects: Phaser.GameObjects.TileSprite[] = [];
+
   private renderPaths(): void {
+    this.pathObjects.forEach(obj => obj.destroy());
+    this.pathObjects = [];
+
     const TILE = GAME_CONFIG.TILE_SIZE;
     for (const path of this.saveData.paths) {
-      const g = this.add.graphics();
-      g.setDepth(0);
       const x = path.col * TILE;
       const y = path.row * TILE;
 
-      let color: number;
+      let textureKey: string;
       switch (path.type) {
-        case 'stone': color = 0x808080; break;
-        case 'wood': color = 0x8b6914; break;
-        case 'grass': color = 0x6db856; break;
-        default: color = 0x808080;
+        case 'stone': textureKey = 'tile_stone'; break;
+        case 'wood': textureKey = 'tile_wood'; break;
+        case 'grass': textureKey = 'tile_grass'; break;
+        default: textureKey = 'tile_stone';
       }
 
-      g.fillStyle(color, 0.7);
-      g.fillRect(x + 1, y + 1, TILE - 2, TILE - 2);
+      const ts = this.add.tileSprite(x, y, TILE, TILE, textureKey);
+      ts.setOrigin(0, 0);
+      ts.setDepth(0);
+      this.pathObjects.push(ts);
     }
   }
 

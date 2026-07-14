@@ -40,39 +40,25 @@ export class PondScene extends Phaser.Scene {
   private createPondMap(): void {
     const TILE = GAME_CONFIG.TILE_SIZE;
 
-    // Pond background
-    const pondBg = this.add.image(32 * TILE / 2, 32 * TILE / 2, 'pond_sprites');
-    pondBg.setDepth(-1);
-    pondBg.setDisplaySize(32 * TILE, 32 * TILE);
+    // Grass background (entire area)
+    const grassBg = this.add.tileSprite(0, 0, 32 * TILE, 32 * TILE, 'tile_grass');
+    grassBg.setOrigin(0, 0);
+    grassBg.setDepth(-1);
 
-    const g = this.add.graphics();
+    // Pond water (center area)
+    const waterBg = this.add.tileSprite(10 * TILE, 10 * TILE, 12 * TILE, 12 * TILE, 'tile_water');
+    waterBg.setOrigin(0, 0);
+    waterBg.setDepth(0);
 
-    // Grass everywhere
-    for (let r = 0; r < 32; r++) {
-      for (let c = 0; c < 32; c++) {
-        g.fillStyle(0x4a8c3f);
-        g.fillRect(c * TILE, r * TILE, TILE, TILE);
-      }
-    }
-
-    // Pond water (center)
-    for (let r = 10; r < 22; r++) {
-      for (let c = 10; c < 22; c++) {
-        g.fillStyle(0x4a6fb5);
-        g.fillRect(c * TILE, r * TILE, TILE, TILE);
-      }
-    }
-
-    // Fishing spots (around pond edge)
+    // Fishing spots (dock tiles around pond edge)
     const spots = [
       { r: 10, c: 9 }, { r: 15, c: 9 }, { r: 20, c: 9 },
       { r: 10, c: 22 }, { r: 15, c: 22 }, { r: 20, c: 22 },
     ];
     for (const spot of spots) {
-      g.fillStyle(0x8B4513);
-      g.fillRect(spot.c * TILE, spot.r * TILE, TILE, TILE);
-      g.fillStyle(0xffffff, 0.5);
-      g.fillRect(spot.c * TILE + 4, spot.r * TILE + 4, 8, 8);
+      const dock = this.add.tileSprite(spot.c * TILE, spot.r * TILE, TILE, TILE, 'tile_dock');
+      dock.setOrigin(0, 0);
+      dock.setDepth(1);
     }
 
     this.physics.world.setBounds(0, 0, 32 * TILE, 32 * TILE);

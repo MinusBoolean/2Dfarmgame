@@ -51,6 +51,23 @@ export class BootScene extends Phaser.Scene {
     // Greenhouse
     this.load.image('greenhouse_sprites', 'assets/sprites/greenhouse_sprites.png');
 
+    // Tile textures
+    this.load.image('tile_grass', 'assets/tilesets/grass_tile.png');
+    this.load.image('tile_dirt', 'assets/tilesets/dirt_tile.png');
+    this.load.image('tile_water', 'assets/tilesets/water_tile.png');
+    this.load.image('tile_plowed', 'assets/tilesets/plowed_tile.png');
+    this.load.image('tile_watered', 'assets/tilesets/watered_tile.png');
+    this.load.image('tile_wood', 'assets/tilesets/wood_plank_tile.png');
+    this.load.image('tile_stone', 'assets/tilesets/stone_path_tile.png');
+    this.load.image('tile_mine_rock', 'assets/tilesets/mine_rock_tile.png');
+    this.load.image('tile_copper', 'assets/tilesets/copper_ore_tile.png');
+    this.load.image('tile_iron', 'assets/tilesets/iron_ore_tile.png');
+    this.load.image('tile_gold', 'assets/tilesets/gold_ore_tile.png');
+    this.load.image('tile_stairs', 'assets/tilesets/mine_stairs_tile.png');
+    this.load.image('tile_fossil', 'assets/tilesets/fossil_tile.png');
+    this.load.image('tile_crystal', 'assets/tilesets/crystal_tile.png');
+    this.load.image('tile_dock', 'assets/tilesets/dock_tile.png');
+
     // Audio (optional - don't fail if missing)
     try {
       this.load.audio('bgm_day', ['assets/audio/bgm/farm_day.mp3']);

@@ -79,24 +79,35 @@ export class GreenhouseScene extends Phaser.Scene {
     const COLS = 12;
     const ROWS = 16;
 
-    const g = this.add.graphics();
-    g.setDepth(0);
+    // Grass floor background
+    const floorBg = this.add.tileSprite(0, 0, COLS * TILE2, ROWS * TILE2, 'tile_grass');
+    floorBg.setOrigin(0, 0);
+    floorBg.setDepth(-1);
 
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        if (r === 0 || r === ROWS - 1 || c === 0 || c === COLS - 1) {
-          g.fillStyle(0x88ccff, 0.5);
-        } else {
-          g.fillStyle(0x2d5a27);
-        }
-        g.fillRect(c * TILE2, r * TILE2, TILE2, TILE2);
-      }
+    // Glass wall border (top and bottom rows, left and right columns)
+    for (let c = 0; c < COLS; c++) {
+      const wallTop = this.add.tileSprite(c * TILE2, 0, TILE2, TILE2, 'tile_water');
+      wallTop.setOrigin(0, 0);
+      wallTop.setDepth(0);
+      const wallBot = this.add.tileSprite(c * TILE2, (ROWS - 1) * TILE2, TILE2, TILE2, 'tile_water');
+      wallBot.setOrigin(0, 0);
+      wallBot.setDepth(0);
+    }
+    for (let r = 1; r < ROWS - 1; r++) {
+      const wallLeft = this.add.tileSprite(0, r * TILE2, TILE2, TILE2, 'tile_water');
+      wallLeft.setOrigin(0, 0);
+      wallLeft.setDepth(0);
+      const wallRight = this.add.tileSprite((COLS - 1) * TILE2, r * TILE2, TILE2, TILE2, 'tile_water');
+      wallRight.setOrigin(0, 0);
+      wallRight.setDepth(0);
     }
 
+    // Soil area (rows 2-9, cols 2-7) - interior farming area
     for (let r = 2; r < 10; r++) {
       for (let c = 2; c < 8; c++) {
-        g.fillStyle(0x8b6914);
-        g.fillRect(c * TILE2, r * TILE2, TILE2, TILE2);
+        const soil = this.add.tileSprite(c * TILE2, r * TILE2, TILE2, TILE2, 'tile_dirt');
+        soil.setOrigin(0, 0);
+        soil.setDepth(0);
       }
     }
 

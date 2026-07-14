@@ -1,0 +1,145 @@
+Texture Plan - Farm Game
+========================
+All distinct tile/element types currently rendered as solid colored rectangles.
+Player, crop indicators (circles/lines), forage items, and small decorations excluded.
+
+Generated from: FarmScene.ts, MineScene.ts, PondScene.ts, GreenhouseScene.ts
+
+========================================================================
+CATEGORY 1: Farm Map Base Tiles (large region fills in createFarmGrid)
+========================================================================
+
+texture_key            | scene(s)                | color     | description
+-----------------------|-------------------------|-----------|--------------------------------------------
+tile_grass             | FarmScene, PondScene    | #4a8c3f   | Default green grass covering most of the map
+tile_farm_soil         | FarmScene               | #8b6914   | Brown plowable farmland area (rows 10-29, cols 10-34)
+tile_stone_fence       | FarmScene               | #808080   | Gray stone fence/boundary line (row 9, cols 10-35)
+tile_house_area        | FarmScene               | #a67c2e   | Tan/brown house foundation pad (rows 5-8, cols 3-7)
+tile_mine_entrance     | FarmScene               | #444444   | Dark gray mine entrance (rows 45-47, cols 30-34)
+tile_workshop          | FarmScene               | #8B4513   | Saddle brown workshop building (rows 35-37, cols 28-31)
+tile_bulletin_board    | FarmScene               | #A0522D   | Sienna bulletin board area (rows 10-11, cols 5-7)
+tile_pond_entrance     | FarmScene               | #4a6fb5   | Blue water entrance to pond (rows 15-17, cols 58-61)
+tile_greenhouse_entr   | FarmScene               | #88ccff   | Light blue greenhouse entrance (rows 5-7, cols 3-6)
+tile_shipping_bin      | FarmScene               | #ffd700   | Gold shipping bin area (rows 40-41, cols 5-7)
+
+========================================================================
+CATEGORY 2: Farm Tile State Overlays (per-tile fillRect in updateTileVisual)
+========================================================================
+
+texture_key            | scene(s)                | color     | description
+-----------------------|-------------------------|-----------|--------------------------------------------
+overlay_plowed         | FarmScene               | #7a5a10   | Dark brown plowed soil state (alpha 0.7)
+overlay_watered        | FarmScene               | #5a3a0a   | Darker brown watered soil state (alpha 0.7)
+overlay_mature         | FarmScene               | #2d8a2d   | Green mature crop background (alpha 0.7)
+overlay_dead           | FarmScene               | #606060   | Gray dead crop background (alpha 0.7)
+
+========================================================================
+CATEGORY 3: Path Tiles (renderPaths - per-tile fillRect)
+========================================================================
+
+texture_key            | scene(s)                | color     | description
+-----------------------|-------------------------|-----------|--------------------------------------------
+path_stone             | FarmScene               | #808080   | Gray stone slab path (alpha 0.7)
+path_wood              | FarmScene               | #8b6914   | Brown wooden plank path (alpha 0.7)
+path_grass             | FarmScene               | #6db856   | Green grass trail path (alpha 0.7)
+
+========================================================================
+CATEGORY 4: Fruit Tree Elements (renderFruitTrees - fillRect trunk)
+========================================================================
+
+texture_key            | scene(s)                | color     | description
+-----------------------|-------------------------|-----------|--------------------------------------------
+tree_trunk             | FarmScene               | #8b4513   | Brown tree trunk, 4px wide rectangle (alpha 0.9)
+
+Note: Tree canopies use fillCircle (0x8b6914 immature, 0x228b22 mature) - not rectangles, excluded.
+
+========================================================================
+CATEGORY 5: Mine Map Tiles (createMineGrid + drawMineTile - all fillRect)
+========================================================================
+
+texture_key            | scene(s)                | color     | description
+-----------------------|-------------------------|-----------|--------------------------------------------
+mine_base              | MineScene               | #333333   | Dark gray base tile background (alpha 0.7)
+mine_rock_outer        | MineScene               | #666666   | Medium gray rock outer layer (alpha 0.7)
+mine_rock_inner        | MineScene               | #555555   | Darker gray rock inner core (alpha 0.7)
+mine_ore_base          | MineScene               | #555555   | Gray base behind ore deposits (alpha 0.7)
+mine_ore_copper        | MineScene               | #cc7722   | Copper ore deposit (alpha 0.7)
+mine_ore_iron          | MineScene               | #aaaaaa   | Iron ore deposit (alpha 0.7)
+mine_ore_gold          | MineScene               | #ffd700   | Gold ore deposit (alpha 0.7)
+mine_stairs_outer      | MineScene               | #444444   | Dark gray stairs entrance (alpha 0.7)
+mine_stairs_step       | MineScene               | #222222   | Darker gray stair step bars (alpha 0.7)
+mine_empty             | MineScene               | #2a2a2a   | Near-black empty/void tile (alpha 0.5)
+mine_collect_fossil    | MineScene               | #ddccaa   | Beige fossil collectible (alpha 0.7)
+mine_collect_crystal   | MineScene               | #aa88ff   | Purple crystal collectible (alpha 0.7)
+mine_collect_relic     | MineScene               | #ffaa55   | Orange relic collectible (alpha 0.7)
+
+========================================================================
+CATEGORY 6: Pond Scene Tiles (createPondMap - fillRect grid)
+========================================================================
+
+texture_key            | scene(s)                | color     | description
+-----------------------|-------------------------|-----------|--------------------------------------------
+pond_water             | PondScene               | #4a6fb5   | Blue water filling the pond center (12x12 tiles)
+pond_dock              | PondScene               | #8B4513   | Brown wooden fishing dock/platform tiles
+
+Note: PondScene grass uses same #4a8c3f as tile_grass (already listed in Category 1).
+
+========================================================================
+CATEGORY 7: Greenhouse Scene Tiles (createGreenhouseMap - fillRect at 2x tile size)
+========================================================================
+
+texture_key            | scene(s)                | color     | description
+-----------------------|-------------------------|-----------|--------------------------------------------
+gh_wall                | GreenhouseScene         | #88ccff   | Light blue glass wall border (alpha 0.5, 2x tile)
+gh_interior            | GreenhouseScene         | #2d5a27   | Dark green interior floor (2x tile size)
+gh_soil                | GreenhouseScene         | #8b6914   | Brown soil planting area (2x tile size)
+gh_plowed              | GreenhouseScene         | #a67c2e   | Lighter brown plowed soil state (alpha 0.9)
+gh_growing             | GreenhouseScene         | #4a6e1a   | Olive green growing crop state (alpha 0.9)
+gh_mature              | GreenhouseScene         | #2d8a2d   | Green mature crop state (alpha 0.9)
+gh_dead                | GreenhouseScene         | #606060   | Gray dead crop state (alpha 0.9)
+
+Note: GH planted (#8b6914) matches gh_soil. GH empty (#8b6914) matches gh_soil.
+      GH mature (#2d8a2d) matches FarmScene overlay_mature.
+      GH dead (#606060) matches FarmScene overlay_dead.
+
+========================================================================
+CATEGORY 8: Overlays and Atmosphere
+========================================================================
+
+texture_key            | scene(s)                | color     | description
+-----------------------|-------------------------|-----------|--------------------------------------------
+overlay_night          | FarmScene               | #000033   | Dark blue full-screen night overlay (alpha 0-0.35)
+
+Note: MineScene dark overlay (0x000000, alpha 0.3) is excluded as it covers the entire
+      floor uniformly and is purely atmospheric, not a tile texture.
+
+========================================================================
+SUMMARY
+========================================================================
+
+Total distinct texture keys: 36
+
+Breakdown by scene:
+  FarmScene:           19 textures (10 base tiles + 4 state overlays + 3 paths + 1 tree trunk + 1 night)
+  MineScene:           13 textures (mine tiles, ore types, stairs, collectibles)
+  PondScene:            2 textures (water, dock) + reuses tile_grass from FarmScene
+  GreenhouseScene:      7 textures (wall, interior, soil, and 4 tile states)
+
+Shared/duplicate colors across scenes (potential texture reuse):
+  #4a8c3f  tile_grass       -> FarmScene + PondScene
+  #8b6914  farm_soil/path_wood/gh_soil -> multiple contexts, same hex
+  #808080  stone_fence/path_stone -> FarmScene (fence and path share color)
+  #8B4513  workshop/pond_dock/tree_trunk -> FarmScene + PondScene
+  #2d8a2d  overlay_mature/gh_mature -> FarmScene + GreenhouseScene
+  #606060  overlay_dead/gh_dead -> FarmScene + GreenhouseScene
+  #88ccff  greenhouse_entrance/gh_wall -> FarmScene entrance + GreenhouseScene wall
+
+Priority recommendation:
+  HIGH   - Mine tiles (13 textures, most complex scene)
+  HIGH   - Farm base tiles (10 textures, largest visible area)
+  MEDIUM - Farm tile state overlays (4 textures, frequently updated)
+  MEDIUM - Greenhouse tiles (7 textures, dedicated scene)
+  MEDIUM - Paths (3 textures, player-placed)
+  LOW    - Pond tiles (2 textures, small scene)
+  LOW    - Tree trunk (1 texture, simple element)
+  LOW    - Night overlay (1 texture, single overlay rectangle)

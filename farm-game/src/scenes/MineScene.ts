@@ -19,7 +19,7 @@ export class MineScene extends Phaser.Scene {
   private facing: 'up' | 'down' | 'left' | 'right' = 'down';
   private selectedTool: 'pickaxe' | 'hoe' | 'wateringCan' = 'pickaxe';
 
-  private tileGraphics: Phaser.GameObjects.Graphics[][] = [];
+  private tileSprites: Phaser.GameObjects.TileSprite[][] = [];
   private messageText!: Phaser.GameObjects.Text;
 
   constructor() { super({ key: 'MineScene' }); }
@@ -62,67 +62,40 @@ export class MineScene extends Phaser.Scene {
     mineBg.setDepth(-1);
     mineBg.setDisplaySize(size * TILE, size * TILE);
 
-    this.tileGraphics = [];
-    const g = this.add.graphics();
-    g.setDepth(0);
-
+    this.tileSprites = [];
     for (let row = 0; row < size; row++) {
-      this.tileGraphics[row] = [];
+      this.tileSprites[row] = [];
       for (let col = 0; col < size; col++) {
         const x = col * TILE;
         const y = row * TILE;
         const tile = this.floorData.tiles[row][col];
-
-        const tileG = this.add.graphics();
-        this.drawMineTile(tileG, tile, x, y, TILE);
-        tileG.setDepth(1);
-        this.tileGraphics[row][col] = tileG;
+        const textureKey = this.getMineTextureKey(tile);
+        const ts = this.add.tileSprite(x, y, TILE, TILE, textureKey);
+        ts.setOrigin(0, 0);
+        ts.setDepth(1);
+        this.tileSprites[row][col] = ts;
       }
     }
   }
 
-  private drawMineTile(g: Phaser.GameObjects.Graphics, tile: MineTileData, x: number, y: number, size: number): void {
-    g.clear();
-    g.fillStyle(0x333333, 0.7);
-    g.fillRect(x, y, size, size);
-
+  private getMineTextureKey(tile: MineTileData): string {
     switch (tile.type) {
-      case 'rock':
-        g.fillStyle(0x666666, 0.7);
-        g.fillRect(x + 2, y + 2, size - 4, size - 4);
-        g.fillStyle(0x555555, 0.7);
-        g.fillRect(x + 4, y + 4, size - 8, size - 8);
-        break;
+      case 'rock': return 'tile_mine_rock';
       case 'ore':
-        const oreColors: Record<OreType, number> = { copper: 0xcc7722, iron: 0xaaaaaa, gold: 0xffd700 };
-        g.fillStyle(0x555555, 0.7);
-        g.fillRect(x + 2, y + 2, size - 4, size - 4);
-        g.fillStyle(oreColors[tile.oreType || 'copper'], 0.7);
-        g.fillRect(x + 5, y + 5, size - 10, size - 10);
-        g.fillStyle(0xffffff, 0.4);
-        g.fillRect(x + 7, y + 7, 3, 3);
-        break;
-      case 'stairs':
-        g.fillStyle(0x444444, 0.7);
-        g.fillRect(x + 2, y + 2, size - 4, size - 4);
-        g.fillStyle(0x222222, 0.7);
-        for (let i = 0; i < 3; i++) {
-          g.fillRect(x + 4 + i * 4, y + 4 + i * 4, size - 8 - i * 8, 3);
+        switch (tile.oreType) {
+          case 'copper': return 'tile_copper';
+          case 'iron': return 'tile_iron';
+          case 'gold': return 'tile_gold';
+          default: return 'tile_mine_rock';
         }
-        break;
+      case 'stairs': return 'tile_stairs';
       case 'collectible':
-        g.fillStyle(0x333333, 0.7);
-        g.fillRect(x, y, size, size);
-        const collectColors: Record<string, number> = { fossil: 0xddccaa, crystal: 0xaa88ff, relic: 0xffaa55 };
-        g.fillStyle(collectColors[tile.collectibleType || 'fossil'] || 0xffffff, 0.7);
-        g.fillRect(x + 6, y + 6, size - 12, size - 12);
-        g.fillStyle(0xffffff, 0.6);
-        g.fillRect(x + 8, y + 8, 3, 3);
-        break;
-      case 'empty':
-        g.fillStyle(0x2a2a2a, 0.5);
-        g.fillRect(x, y, size, size);
-        break;
+        switch (tile.collectibleType) {
+          case 'fossil': return 'tile_fossil';
+          case 'crystal': return 'tile_crystal';
+          default: return 'tile_fossil';
+        }
+      case 'empty': return 'tile_mine_rock';
     }
   }
 
@@ -213,7 +186,8 @@ export class MineScene extends Phaser.Scene {
     }
 
     const TILE = GAME_CONFIG.TILE_SIZE;
-    this.drawMineTile(this.tileGraphics[row][col], tile, col * TILE, row * TILE, TILE);
+    const textureKey = this.getMineTextureKey(tile);
+    this.tileSprites[row][col].setTexture(textureKey);
 
     this.cameras.main.shake(100, 0.005);
 
