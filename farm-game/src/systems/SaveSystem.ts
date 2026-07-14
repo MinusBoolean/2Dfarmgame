@@ -53,6 +53,10 @@ export class SaveSystem {
       completedQuests: 0,
       collectedItems: [],
       pickaxeLevel: 1,
+      foragePositions: [],
+      fruitTrees: [],
+      paths: [],
+      greenhouseUnlocked: false,
     };
   }
 

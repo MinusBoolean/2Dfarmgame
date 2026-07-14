@@ -58,7 +58,7 @@ export interface SaveData {
   unlockedCrops: string[];
   farmRating: FarmRating;
   tutorialDay: number;
-  shippingBin: InventoryItem[];
+  shippingBin: ShippingBinItem[];
   settings: {
     musicVolume: number;
     sfxVolume: number;
@@ -73,6 +73,10 @@ export interface SaveData {
   completedQuests: number;
   collectedItems: string[];
   pickaxeLevel: number;
+  foragePositions: { id: string; row: number; col: number }[];
+  fruitTrees: { id: string; row: number; col: number; plantDay: number; lastHarvestDay: number }[];
+  paths: { row: number; col: number; type: PathType }[];
+  greenhouseUnlocked: boolean;
 }
 
 // ─── V2 Types ────────────────────────────────────────
@@ -121,4 +125,43 @@ export interface WorkshopRecipe {
   materials: { itemId: string; quantity: number }[];
   goldCost: number;
   result: { type: 'tool_upgrade' | 'item'; tool?: 'hoe' | 'wateringCan' | 'pickaxe'; itemId?: string; quantity?: number };
+}
+
+// ─── V3 Types ────────────────────────────────────────
+
+export interface FishData {
+  id: string;
+  name: string;
+  seasons: Season[];
+  weather: Weather[];
+  probability: number;
+  sellPrice: number;
+}
+
+export interface ForageItem {
+  id: string;
+  name: string;
+  seasons: Season[];
+  probability: number;
+  sellPrice: number;
+}
+
+export interface FruitTreeData {
+  id: string;
+  name: string;
+  price: number;
+  growthDays: number;
+  fruitId: string;
+  fruitName: string;
+  fruitSellPrice: number;
+  seasons: Season[];
+}
+
+export type PathType = 'stone' | 'wood' | 'grass';
+
+export interface ShippingBinItem {
+  id: string;
+  name: string;
+  quantity: number;
+  sellPrice: number;
 }

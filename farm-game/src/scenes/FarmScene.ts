@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME_CONFIG } from '../config';
 import { SaveData, TileSaveData, ToolType, Weather, Season, InventoryItem } from '../types';
 import { SaveSystem } from '../systems/SaveSystem';
+import { ShippingBinSystem } from '../systems/ShippingBinSystem';
 import { InventorySystem } from '../systems/InventorySystem';
 import { EnergySystem } from '../systems/EnergySystem';
 import { GrowthSystem } from '../systems/GrowthSystem';
@@ -1005,19 +1006,11 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private settleShippingBin(): void {
-    for (const item of this.saveData.shippingBin) {
-      if (item.type === 'crop' && item.cropId) {
-        const crop = getCropById(item.cropId);
-        if (crop) {
-          const qualityMap: Record<string, number> = { normal: 1, silver: 1.25, gold: 1.5, iridium: 2 };
-          const mult = qualityMap[item.quality || 'normal'] || 1;
-          const price = Math.floor(crop.sellPrice * mult) * item.quantity;
-          this.saveData.gold += price;
-          this.saveData.totalEarned += price;
-        }
-      }
+    const total = ShippingBinSystem.settleDaily(this.saveData.shippingBin);
+    if (total > 0) {
+      this.saveData.gold += total;
+      this.saveData.totalEarned += total;
     }
-    this.saveData.shippingBin = [];
     this.emitEvent('gold-changed', this.saveData.gold);
   }
 
