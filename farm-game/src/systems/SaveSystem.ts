@@ -57,6 +57,13 @@ export class SaveSystem {
       fruitTrees: [],
       paths: [],
       greenhouseUnlocked: false,
+      greenhouseGrid: Array.from({ length: 8 }, () =>
+        Array.from({ length: 6 }, () => ({
+          state: 'empty' as const,
+          wateredToday: true,
+          consecutiveWaterDays: 0,
+        }))
+      ),
     };
   }
 
@@ -92,9 +99,9 @@ export class SaveSystem {
         (data as any)[key] = defaults[key];
       }
     }
-    // Ensure farmGrid dimensions match current config
-    if (!data.farmGrid || data.farmGrid.length !== GAME_CONFIG.FARM_ROWS) {
-      data.farmGrid = defaults.farmGrid;
+    // Ensure greenhouseGrid exists and has correct dimensions
+    if (!data.greenhouseGrid || data.greenhouseGrid.length !== 8 || data.greenhouseGrid[0]?.length !== 6) {
+      data.greenhouseGrid = defaults.greenhouseGrid;
     }
     return data;
   }

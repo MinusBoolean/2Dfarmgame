@@ -63,6 +63,7 @@ export class FarmScene extends Phaser.Scene {
   private matureTweens: Phaser.Tweens.Tween[] = [];
   private overlayObjects: Phaser.GameObjects.GameObject[] = [];
   private shopOpen: boolean = false;
+  private shopMode: 'buy' | 'sell' = 'buy';
   private seedSelectOpen: boolean = false;
   private workshopPanel!: WorkshopPanel;
   private bulletinBoard!: BulletinBoard;
@@ -103,6 +104,10 @@ export class FarmScene extends Phaser.Scene {
       SaveSystem.save(this.saveData);
     });
     this.shippingBinPanel = new ShippingBinPanel(this, this.saveData, this.inventory);
+
+    if (!this.scene.isActive('UIScene')) {
+      this.scene.launch('UIScene');
+    }
 
     if (this.saveData.tomorrowWeather === 'sunny' && this.saveData.currentDay === 1 && this.saveData.currentSeason === 0) {
       this.saveData.tomorrowWeather = WeatherSystem.generateWeather(
@@ -499,15 +504,23 @@ export class FarmScene extends Phaser.Scene {
         this.bulletinBoard.toggle();
       }
     });
-    this.input.keyboard.on('keydown-P', () => this.togglePathMode());
+    this.input.keyboard.on('keydown-P', () => this.togglePause());
+    this.input.keyboard.on('keydown-O', () => this.togglePathMode());
     this.input.keyboard.on('keydown-Q', () => this.cycleSeed());
     this.input.keyboard.on('keydown-H', () => this.tryHarvest());
+
+    const uiScene = this.scene.get('UIScene');
+    uiScene.events.on('tool-changed', (tool: ToolType) => {
+      this.selectTool(tool);
+    });
   }
 
   private selectTool(tool: ToolType): void {
     if (this.isPaused) return;
     this.selectedTool = tool;
     this.audio.playSfx('sfx_click');
+    this.emitEvent('tool-sync', tool);
+    this.emitEvent('inventory-changed', this.inventory.getItems());
   }
 
   private cycleSeed(): void {
@@ -535,16 +548,20 @@ export class FarmScene extends Phaser.Scene {
     }
     this.closeOverlay();
 
+    if (this.saveData.tutorialDay === 5) {
+      TutorialSystem.advanceTutorial(this.saveData);
+    }
+
     const season = SeasonSystem.getSeason(this.saveData.currentSeason);
     const unlocked = getUnlockedCrops(this.saveData.totalEarned);
     const available = unlocked.filter(c => c.seasons.includes(season));
-
-    // Add fruit tree saplings
     const trees = FruitTreeSystem.TREES;
 
     const { width, height } = this.scale;
-    const totalItems = available.length + trees.length;
-    const panelW = 280, panelH = 40 + totalItems * 24;
+    const buyItemCount = available.length + trees.length + 2; // +2 for bread and scarecrow
+    const sellItems = this.inventory.getItems().filter(i => i.type === 'crop');
+    const maxItemCount = Math.max(buyItemCount, sellItems.length);
+    const panelW = 300, panelH = 60 + maxItemCount * 24;
     const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.6).setDepth(200).setScrollFactor(0);
 
     const itemsBg = this.add.image(width / 2, height / 2, 'items');
@@ -561,76 +578,197 @@ export class FarmScene extends Phaser.Scene {
 
     this.overlayObjects = [overlay, itemsBg, panel, title];
 
-    if (totalItems === 0) {
-      const t = this.add.text(width / 2, height / 2, '当季没有可购买的种子', {
-        fontSize: '13px', color: '#ffffff',
-      }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
-      this.overlayObjects.push(t);
-    } else {
-      // Seeds
-      available.forEach((crop, i) => {
-        const y = height / 2 - panelH / 2 + 40 + i * 24;
-        const label = `${crop.name}种子 - ${crop.seedPrice}金 | 卖价${crop.sellPrice}`;
-        const t = this.add.text(width / 2, y, label, {
-          fontSize: '13px', color: '#ffffff',
-        }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
-        t.setInteractive({ useHandCursor: true });
-        t.on('pointerdown', () => {
-          if (EconomySystem.buySeed(this.saveData, this.inventory, crop.id)) {
-            this.showMessage(`购买了 ${crop.name}种子 (-${crop.seedPrice}金币)`);
-            this.audio.playSfx('sfx_coin');
-            this.emitEvent('gold-changed', this.saveData.gold);
-            this.emitEvent('save-indicator');
-            SaveSystem.save(this.saveData);
-          } else {
-            this.showMessage('金币不足或背包已满！');
-          }
-          this.closeOverlay();
-          this.shopOpen = false;
-        });
-        t.on('pointerover', () => t.setColor('#ffd700'));
-        t.on('pointerout', () => t.setColor('#ffffff'));
-        this.overlayObjects.push(t);
-      });
+    // Tab buttons
+    const tabY = height / 2 - panelH / 2 + 36;
+    const buyTab = this.add.text(width / 2 - 50, tabY, '购买', {
+      fontSize: '14px', color: this.shopMode === 'buy' ? '#ffd700' : '#888',
+    }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
+    buyTab.setInteractive({ useHandCursor: true });
+    buyTab.on('pointerdown', () => {
+      this.shopMode = 'buy';
+      this.closeOverlay();
+      this.shopOpen = false;
+      this.toggleShop();
+    });
+    this.overlayObjects.push(buyTab);
 
-      // Fruit tree saplings
-      trees.forEach((tree, i) => {
-        const y = height / 2 - panelH / 2 + 40 + (available.length + i) * 24;
-        const label = `${tree.name}苗 - ${tree.price}金 | 产${tree.fruitName}(${tree.fruitSellPrice}G)`;
-        const t = this.add.text(width / 2, y, label, {
-          fontSize: '13px', color: '#88cc88',
-        }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
-        t.setInteractive({ useHandCursor: true });
-        t.on('pointerdown', () => {
-          if (this.saveData.gold >= tree.price) {
-            if (this.inventory.isFull()) {
-              this.showMessage('背包已满！');
-              return;
-            }
-            this.saveData.gold -= tree.price;
-            this.inventory.addItem({
-              id: `sapling_${tree.id}`,
-              name: `${tree.name}苗`,
-              type: 'crop',
-              quantity: 1,
-            });
-            this.showMessage(`购买了 ${tree.name}苗 (-${tree.price}金币)`);
-            this.audio.playSfx('sfx_coin');
-            this.emitEvent('gold-changed', this.saveData.gold);
-            SaveSystem.save(this.saveData);
-          } else {
-            this.showMessage('金币不足！');
-          }
-          this.closeOverlay();
-          this.shopOpen = false;
-        });
-        t.on('pointerover', () => t.setColor('#ffd700'));
-        t.on('pointerout', () => t.setColor('#88cc88'));
-        this.overlayObjects.push(t);
-      });
+    const sellTab = this.add.text(width / 2 + 50, tabY, '出售', {
+      fontSize: '14px', color: this.shopMode === 'sell' ? '#ffd700' : '#888',
+    }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
+    sellTab.setInteractive({ useHandCursor: true });
+    sellTab.on('pointerdown', () => {
+      this.shopMode = 'sell';
+      this.closeOverlay();
+      this.shopOpen = false;
+      this.toggleShop();
+    });
+    this.overlayObjects.push(sellTab);
+
+    // Separator
+    const sepY = tabY + 14;
+    const sep = this.add.rectangle(width / 2, sepY, panelW - 20, 1, 0xffd700, 0.5).setDepth(202).setScrollFactor(0);
+    this.overlayObjects.push(sep);
+
+    if (this.shopMode === 'buy') {
+      this.renderBuyShop(available, trees, width, height, panelH);
+    } else {
+      this.renderSellShop(sellItems, width, height, panelH);
     }
 
     this.shopOpen = true;
+  }
+
+  private renderBuyShop(available: any[], trees: any[], width: number, height: number, panelH: number): void {
+    const season = SeasonSystem.getSeason(this.saveData.currentSeason);
+
+    // Seeds
+    available.forEach((crop, i) => {
+      const y = height / 2 - panelH / 2 + 68 + i * 24;
+      const label = `${crop.name}种子 - ${crop.seedPrice}金 | 卖价${crop.sellPrice}`;
+      const t = this.add.text(width / 2, y, label, {
+        fontSize: '13px', color: '#ffffff',
+      }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
+      t.setInteractive({ useHandCursor: true });
+      t.on('pointerdown', () => {
+        if (EconomySystem.buySeed(this.saveData, this.inventory, crop.id)) {
+          this.showMessage(`购买了 ${crop.name}种子 (-${crop.seedPrice}金币)`);
+          this.audio.playSfx('sfx_coin');
+          this.emitEvent('gold-changed', this.saveData.gold);
+          this.emitEvent('inventory-changed', this.inventory.getItems());
+          this.emitEvent('save-indicator');
+          SaveSystem.save(this.saveData);
+        } else {
+          this.showMessage('金币不足或背包已满！');
+        }
+        this.closeOverlay();
+        this.shopOpen = false;
+      });
+      t.on('pointerover', () => t.setColor('#ffd700'));
+      t.on('pointerout', () => t.setColor('#ffffff'));
+      this.overlayObjects.push(t);
+    });
+
+    // Fruit tree saplings
+    trees.forEach((tree, i) => {
+      const y = height / 2 - panelH / 2 + 68 + (available.length + i) * 24;
+      const label = `${tree.name}苗 - ${tree.price}金 | 产${tree.fruitName}(${tree.fruitSellPrice}G)`;
+      const t = this.add.text(width / 2, y, label, {
+        fontSize: '13px', color: '#88cc88',
+      }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
+      t.setInteractive({ useHandCursor: true });
+      t.on('pointerdown', () => {
+        if (this.saveData.gold >= tree.price) {
+          if (this.inventory.isFull()) {
+            this.showMessage('背包已满！');
+            return;
+          }
+          this.saveData.gold -= tree.price;
+          this.inventory.addItem({
+            id: `sapling_${tree.id}`,
+            name: `${tree.name}苗`,
+            type: 'crop',
+            quantity: 1,
+          });
+          this.showMessage(`购买了 ${tree.name}苗 (-${tree.price}金币)`);
+          this.audio.playSfx('sfx_coin');
+          this.emitEvent('gold-changed', this.saveData.gold);
+          this.emitEvent('inventory-changed', this.inventory.getItems());
+          SaveSystem.save(this.saveData);
+        } else {
+          this.showMessage('金币不足！');
+        }
+        this.closeOverlay();
+        this.shopOpen = false;
+      });
+      t.on('pointerover', () => t.setColor('#ffd700'));
+      t.on('pointerout', () => t.setColor('#88cc88'));
+      this.overlayObjects.push(t);
+    });
+
+    const itemOffset = available.length + trees.length;
+
+    // Buy bread
+    const breadY = height / 2 - panelH / 2 + 68 + itemOffset * 24;
+    const breadText = this.add.text(width / 2, breadY, '面包 - 20金 (恢复30体力)', {
+      fontSize: '13px', color: '#ffcc88',
+    }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
+    breadText.setInteractive({ useHandCursor: true });
+    breadText.on('pointerdown', () => {
+      if (EconomySystem.buyFood(this.saveData, this.inventory)) {
+        this.showMessage('购买了面包 (-20金币)');
+        this.audio.playSfx('sfx_coin');
+        this.emitEvent('gold-changed', this.saveData.gold);
+        this.emitEvent('save-indicator');
+        SaveSystem.save(this.saveData);
+      } else {
+        this.showMessage('金币不足或背包已满！');
+      }
+      this.closeOverlay();
+      this.shopOpen = false;
+    });
+    breadText.on('pointerover', () => breadText.setColor('#ffd700'));
+    breadText.on('pointerout', () => breadText.setColor('#ffcc88'));
+    this.overlayObjects.push(breadText);
+
+    // Buy scarecrow
+    const scareY = height / 2 - panelH / 2 + 68 + (itemOffset + 1) * 24;
+    const scareText = this.add.text(width / 2, scareY, '稻草人 - 50金 (保护作物)', {
+      fontSize: '13px', color: '#cc9988',
+    }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
+    scareText.setInteractive({ useHandCursor: true });
+    scareText.on('pointerdown', () => {
+      if (EconomySystem.buyScarecrow(this.saveData, this.inventory)) {
+        this.showMessage('购买了稻草人 (-50金币)');
+        this.audio.playSfx('sfx_coin');
+        this.emitEvent('gold-changed', this.saveData.gold);
+        this.emitEvent('save-indicator');
+        SaveSystem.save(this.saveData);
+      } else {
+        this.showMessage('金币不足或背包已满！');
+      }
+      this.closeOverlay();
+      this.shopOpen = false;
+    });
+    scareText.on('pointerover', () => scareText.setColor('#ffd700'));
+    scareText.on('pointerout', () => scareText.setColor('#cc9988'));
+    this.overlayObjects.push(scareText);
+  }
+
+  private renderSellShop(items: any[], width: number, height: number, panelH: number): void {
+    if (items.length === 0) {
+      const t = this.add.text(width / 2, height / 2, '没有可出售的作物', {
+        fontSize: '13px', color: '#ffffff',
+      }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
+      this.overlayObjects.push(t);
+      return;
+    }
+
+    items.forEach((item, i) => {
+      const y = height / 2 - panelH / 2 + 68 + i * 24;
+      const crop = getCropById(item.cropId || '');
+      if (!crop) return;
+      const qualityMultiplier = EconomySystem.getQualityMultiplier(item.quality || 'normal');
+      const price = Math.floor(crop.sellPrice * qualityMultiplier);
+      const qualityLabel = item.quality && item.quality !== 'normal' ? `[${item.quality}]` : '';
+      const label = `${item.name}${qualityLabel} x${item.quantity} - 售价 ${price}金`;
+      const t = this.add.text(width / 2, y, label, {
+        fontSize: '13px', color: '#ffcc88',
+      }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
+      t.setInteractive({ useHandCursor: true });
+      t.on('pointerdown', () => {
+        EconomySystem.sellItem(this.saveData, this.inventory, item.id, item.quality);
+        this.showMessage(`出售了 ${item.name} (+${price}金币)`);
+        this.emitEvent('gold-changed', this.saveData.gold);
+        this.emitEvent('save-indicator');
+        SaveSystem.save(this.saveData);
+        this.closeOverlay();
+        this.shopOpen = false;
+        this.toggleShop();
+      });
+      t.on('pointerover', () => t.setColor('#ffd700'));
+      t.on('pointerout', () => t.setColor('#ffcc88'));
+      this.overlayObjects.push(t);
+    });
   }
 
   private togglePause(): void {
@@ -736,6 +874,7 @@ export class FarmScene extends Phaser.Scene {
           if (this.inventory.addItem(forageItem)) {
             this.showMessage(`捡到了 ${forage.name}！`);
             this.audio.playSfx('sfx_click');
+            this.emitEvent('inventory-changed', this.inventory.getItems());
             toRemove.push(index);
           }
         }
@@ -976,6 +1115,10 @@ export class FarmScene extends Phaser.Scene {
     this.showParticles(row, col, 'dirt');
     this.cameras.main.shake(80, 0.002);
     this.audio.playSfx('sfx_plow');
+
+    if (this.saveData.tutorialDay === 1) {
+      TutorialSystem.advanceTutorial(this.saveData);
+    }
   }
 
   private plantCrop(tile: TileSaveData, row: number, col: number): void {
@@ -1069,6 +1212,11 @@ export class FarmScene extends Phaser.Scene {
     this.showParticles(row, col, 'dirt');
     this.audio.playSfx('sfx_plant');
     this.showMessage(`种下了 ${crop.name}`);
+    this.emitEvent('inventory-changed', this.inventory.getItems());
+
+    if (this.saveData.tutorialDay === 2) {
+      TutorialSystem.advanceTutorial(this.saveData);
+    }
   }
 
   private waterTile(tile: TileSaveData, row: number, col: number): void {
@@ -1090,6 +1238,10 @@ export class FarmScene extends Phaser.Scene {
     this.updateTileVisual(row, col);
     this.showParticles(row, col, 'water');
     this.audio.playSfx('sfx_water');
+
+    if (this.saveData.tutorialDay === 3) {
+      TutorialSystem.advanceTutorial(this.saveData);
+    }
   }
 
   private tryHarvest(): void {
@@ -1139,7 +1291,14 @@ export class FarmScene extends Phaser.Scene {
     this.audio.playSfx('sfx_harvest');
     this.showMessage(`收获了 ${crop.name}${quality !== 'normal' ? ` (${quality})` : ''}！`);
 
+    QuestSystem.updateProgress(this.saveData, 'harvest', crop.id);
+
+    if (this.saveData.tutorialDay === 4) {
+      TutorialSystem.advanceTutorial(this.saveData);
+    }
+
     this.emitEvent('energy-changed', this.saveData.energy);
+    this.emitEvent('inventory-changed', this.inventory.getItems());
     this.emitEvent('save-indicator');
     SaveSystem.save(this.saveData);
   }
@@ -1155,6 +1314,8 @@ export class FarmScene extends Phaser.Scene {
     this.saveData.energy = EnergySystem.restore(this.saveData.energy, 30);
     this.showMessage(`吃了 ${food.name} (+30体力)`);
     this.audio.playSfx('sfx_click');
+    this.emitEvent('energy-changed', this.saveData.energy);
+    this.emitEvent('inventory-changed', this.inventory.getItems());
   }
 
   // ─── Particles ──────────────────────────────────────────────
@@ -1303,6 +1464,15 @@ export class FarmScene extends Phaser.Scene {
       }
     }
 
+    // Advance greenhouse tiles (auto-watered, no season restriction)
+    if (this.saveData.greenhouseGrid) {
+      for (const row of this.saveData.greenhouseGrid) {
+        for (const tile of row) {
+          GrowthSystem.advanceGreenhouseTile(tile);
+        }
+      }
+    }
+
     this.saveData.energy = this.saveData.maxEnergy;
 
     this.settleShippingBin();
@@ -1320,6 +1490,8 @@ export class FarmScene extends Phaser.Scene {
       this.saveData.farmRating = newRating;
       this.showMessage(`农场评级提升至 ${RatingSystem.getRatingName(newRating)}！`);
     }
+
+    TutorialSystem.advanceTutorial(this.saveData);
 
     // Daily summary
     const dayIncome = this.saveData.gold - prevGold;
@@ -1479,6 +1651,8 @@ export class FarmScene extends Phaser.Scene {
     this.emitEvent('weather-changed', s.currentWeather);
     this.emitEvent('energy-changed', s.energy);
     this.emitEvent('season-changed', season);
+    this.emitEvent('tool-sync', this.selectedTool);
+    this.emitEvent('inventory-changed', this.inventory.getItems());
 
     const tutorialTask = TutorialSystem.getCurrentTask(s);
     if (tutorialTask) {

@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { SaveData, ShippingBinItem } from '../types';
 import { ShippingBinSystem } from '../systems/ShippingBinSystem';
 import { InventorySystem } from '../systems/InventorySystem';
+import { EconomySystem } from '../systems/EconomySystem';
+import { getCropById } from '../entities/CropConfig';
 
 export class ShippingBinPanel {
   private scene: Phaser.Scene;
@@ -70,7 +72,10 @@ export class ShippingBinPanel {
     this.scene.input.keyboard!.once('keydown-ENTER', () => {
       const item = items[this.selectedIndex];
       if (item) {
-        const price = Math.floor((item.quality === 'iridium' ? 2 : item.quality === 'gold' ? 1.5 : item.quality === 'silver' ? 1.25 : 1) * 20);
+        const crop = item.cropId ? getCropById(item.cropId) : null;
+        const basePrice = crop ? crop.sellPrice : 20;
+        const qualityMultiplier = EconomySystem.getQualityMultiplier(item.quality || 'normal');
+        const price = Math.floor(basePrice * qualityMultiplier);
         ShippingBinSystem.addItem(this.saveData.shippingBin, { id: item.id, name: item.name, sellPrice: price }, 1);
         this.inventory.removeItem(item.id, 1, item.quality);
         this.render();

@@ -188,7 +188,7 @@ export class MineScene extends Phaser.Scene {
     const tile = this.floorData.tiles[row][col];
     if (tile.type !== 'rock' && tile.type !== 'ore' && tile.type !== 'collectible') return;
 
-    const cost = 3;
+    const cost = EnergySystem.getActionCost('MINE', this.saveData.pickaxeLevel);
     if (!EnergySystem.canPerform(this.saveData.energy, cost)) {
       this.showMessage('体力不足！');
       return;
@@ -242,6 +242,7 @@ export class MineScene extends Phaser.Scene {
   private returnToFarm(): void {
     this.saveData.mineData.currentFloor = this.currentFloor;
     SaveSystem.save(this.saveData);
+    this.scene.stop('UIScene');
     this.scene.start('FarmScene', { saveData: this.saveData });
   }
 

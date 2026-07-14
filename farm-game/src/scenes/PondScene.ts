@@ -6,6 +6,7 @@ import { FishingSystem } from '../systems/FishingSystem';
 import { InventorySystem } from '../systems/InventorySystem';
 import { SeasonSystem } from '../systems/SeasonSystem';
 import { WeatherSystem } from '../systems/WeatherSystem';
+import { EnergySystem } from '../systems/EnergySystem';
 
 export class PondScene extends Phaser.Scene {
   private saveData!: SaveData;
@@ -178,6 +179,13 @@ export class PondScene extends Phaser.Scene {
     this.successZone.setVisible(false);
     this.fishPointer.setVisible(false);
 
+    const cost = EnergySystem.getActionCost('FISH', 1);
+    if (!EnergySystem.canPerform(this.saveData.energy, cost)) {
+      this.showMessage('体力不足！');
+      return;
+    }
+    this.saveData.energy = EnergySystem.consume(this.saveData.energy, cost);
+
     // Check if pointer is in success zone
     const pointerY = this.fishPointer.y;
     const zoneY = this.successZone.y;
@@ -188,7 +196,7 @@ export class PondScene extends Phaser.Scene {
     const fish = FishingSystem.catchFish(season, this.saveData.currentWeather, accuracy);
 
     if (fish) {
-      this.inventory.addItem({ id: `fish_${fish.id}`, name: fish.name, type: 'crop', quantity: 1 });
+      this.inventory.addItem({ id: `fish_${fish.id}`, name: fish.name, type: 'fish', quantity: 1, fishId: fish.id });
       this.showMessage(`钓到 ${fish.name}！(售价 ${fish.sellPrice}G)`);
     } else {
       this.showMessage('鱼跑掉了...');
@@ -199,6 +207,7 @@ export class PondScene extends Phaser.Scene {
 
   private returnToFarm(): void {
     SaveSystem.save(this.saveData);
+    this.scene.stop('UIScene');
     this.scene.start('FarmScene', { saveData: this.saveData });
   }
 

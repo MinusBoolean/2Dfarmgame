@@ -25,10 +25,11 @@ export interface CropConfig {
 export interface InventoryItem {
   id: string;
   name: string;
-  type: 'seed' | 'crop' | 'food' | 'scarecrow';
+  type: 'seed' | 'crop' | 'food' | 'scarecrow' | 'fish';
   quantity: number;
   quality?: QualityTier;
   cropId?: string;
+  fishId?: string;
 }
 
 export interface TileSaveData {
@@ -77,6 +78,7 @@ export interface SaveData {
   fruitTrees: { id: string; row: number; col: number; plantDay: number; lastHarvestDay: number }[];
   paths: { row: number; col: number; type: PathType }[];
   greenhouseUnlocked: boolean;
+  greenhouseGrid: TileSaveData[][];
 }
 
 // ─── V2 Types ────────────────────────────────────────

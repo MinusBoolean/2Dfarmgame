@@ -18,6 +18,15 @@ export class GrowthSystem {
     return true;
   }
 
+  static advanceGreenhouseTile(tile: TileSaveData): void {
+    if (tile.state !== 'planted' && tile.state !== 'growing') return;
+    const crop = getCropById(tile.cropId || '');
+    if (!crop) return;
+    tile.wateredToday = true;
+    tile.consecutiveWaterDays++;
+    this.advanceGrowth(tile, 1);
+  }
+
   static advanceGrowth(tile: TileSaveData, daysPassed: number): void {
     if (tile.state !== 'planted' && tile.state !== 'growing') return;
     const crop = getCropById(tile.cropId || '');

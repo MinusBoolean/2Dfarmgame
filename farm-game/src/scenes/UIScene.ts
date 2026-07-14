@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_CONFIG } from '../config';
-import { Season, Weather, ToolType } from '../types';
+import { Season, Weather, ToolType, InventoryItem } from '../types';
 
 export class UIScene extends Phaser.Scene {
   private goldText!: Phaser.GameObjects.Text;
@@ -13,6 +13,8 @@ export class UIScene extends Phaser.Scene {
   private toolbarIcons: Phaser.GameObjects.Text[] = [];
   private selectedTool: ToolType = 'hoe';
   private selectedToolIndex: number = 0;
+  private foodCountText!: Phaser.GameObjects.Text;
+  private inventoryTexts: Phaser.GameObjects.Text[] = [];
 
   constructor() { super({ key: 'UIScene' }); }
 
@@ -36,6 +38,7 @@ export class UIScene extends Phaser.Scene {
     this.saveIndicator = this.add.text(400, 580, '', { fontSize: '12px', color: '#88ff88' }).setOrigin(0.5).setAlpha(0);
 
     this.createToolbar();
+    this.createInventoryBar();
 
     const farmScene = this.scene.get('FarmScene');
     farmScene.events.on('gold-changed', (gold: number) => this.updateGold(gold));
@@ -43,6 +46,11 @@ export class UIScene extends Phaser.Scene {
     farmScene.events.on('weather-changed', (weather: Weather) => this.updateWeather(weather));
     farmScene.events.on('energy-changed', (energy: number) => this.updateEnergy(energy));
     farmScene.events.on('save-indicator', () => this.showSaveIndicator());
+    farmScene.events.on('tool-sync', (tool: string) => {
+      const map: Record<string, number> = { hoe: 0, wateringCan: 1, food: 2 };
+      this.selectToolIndex(map[tool] ?? 0);
+    });
+    farmScene.events.on('inventory-changed', (items: InventoryItem[]) => this.updateInventoryDisplay(items));
   }
 
   private createToolbar(): void {
@@ -66,17 +74,24 @@ export class UIScene extends Phaser.Scene {
       const x = startX + i * (slotW + gap);
       const slot = this.add.rectangle(x + slotW / 2, startY + 20, slotW, slotH, 0x333333, 0.8);
       slot.setStrokeStyle(2, i === 0 ? 0xffd700 : 0x666666);
+      slot.setInteractive({ useHandCursor: true });
       this.toolbarSlots.push(slot);
 
       const icon = this.add.text(x + slotW / 2, startY + 20, tools[i].icon, { fontSize: '20px' }).setOrigin(0.5);
       this.toolbarIcons.push(icon);
 
-      this.add.text(x + slotW / 2, startY + 44, `${i + 1}`, { fontSize: '10px', color: '#888' }).setOrigin(0.5);
+      const numberLabel = this.add.text(x + slotW / 2, startY + 44, `${i + 1}`, { fontSize: '10px', color: '#888' }).setOrigin(0.5);
+
+      const toolType = tools[i].tool;
+      slot.on('pointerdown', () => {
+        const farmScene = this.scene.get('FarmScene');
+        farmScene.events.emit('tool-changed', toolType);
+      });
     }
 
-    this.input.keyboard!.on('keydown-ONE', () => this.selectToolIndex(0));
-    this.input.keyboard!.on('keydown-TWO', () => this.selectToolIndex(1));
-    this.input.keyboard!.on('keydown-THREE', () => this.selectToolIndex(2));
+    this.foodCountText = this.add.text(startX + 2 * (slotW + gap) + slotW / 2, startY + 28, '0', {
+      fontSize: '10px', color: '#aaa',
+    }).setOrigin(0.5);
   }
 
   private selectToolIndex(index: number): void {
@@ -112,5 +127,34 @@ export class UIScene extends Phaser.Scene {
       duration: 1000,
       ease: 'Power2',
     });
+  }
+
+  private createInventoryBar(): void {
+    const startY = 520;
+    const x = 400;
+    this.add.text(x, startY, '背包:', { fontSize: '11px', color: '#aaa' }).setOrigin(0.5, 0);
+    for (let i = 0; i < 6; i++) {
+      const slotX = 340 + i * 40;
+      const bg = this.add.rectangle(slotX, startY + 16, 36, 36, 0x222222, 0.7).setStrokeStyle(1, 0x444444);
+      const txt = this.add.text(slotX, startY + 16, '', { fontSize: '10px', color: '#ffffff' }).setOrigin(0.5);
+      this.inventoryTexts.push(txt);
+    }
+  }
+
+  private updateInventoryDisplay(items: InventoryItem[]): void {
+    let foodCount = 0;
+    for (const item of items) {
+      if (item.type === 'food') foodCount += item.quantity;
+    }
+    this.foodCountText.setText(`${foodCount}`);
+
+    for (let i = 0; i < this.inventoryTexts.length; i++) {
+      if (i < items.length) {
+        const item = items[i];
+        this.inventoryTexts[i].setText(`${item.name[0]}x${item.quantity}`);
+      } else {
+        this.inventoryTexts[i].setText('');
+      }
+    }
   }
 }

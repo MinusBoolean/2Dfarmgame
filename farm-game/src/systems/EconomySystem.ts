@@ -58,7 +58,7 @@ export class EconomySystem {
     return true;
   }
 
-  private static getQualityMultiplier(quality: QualityTier): number {
+  public static getQualityMultiplier(quality: QualityTier): number {
     const map: Record<QualityTier, number> = { normal: 1, silver: 1.25, gold: 1.5, iridium: 2 };
     return map[quality];
   }

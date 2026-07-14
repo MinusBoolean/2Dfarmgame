@@ -23,6 +23,8 @@ export const GAME_CONFIG = {
     PLANT: 1,
     WATER: 2,
     HARVEST: 1,
+    MINE: 3,
+    FISH: 4,
   },
   QUALITY_TIERS: {
     NORMAL: { name: 'normal' as const, multiplier: 1, minWaterDays: 0 },
