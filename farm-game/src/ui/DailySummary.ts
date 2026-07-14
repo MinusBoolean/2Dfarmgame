@@ -5,6 +5,10 @@ export class DailySummary {
     const { width, height } = scene.scale;
 
     const overlay = scene.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7).setDepth(200).setScrollFactor(0);
+
+    const panelBg = scene.add.image(width / 2, height / 2, 'ui_elements').setDepth(200).setScrollFactor(0);
+    panelBg.setDisplaySize(300, 200);
+
     const panel = scene.add.rectangle(width / 2, height / 2, 300, 200, 0x222222).setDepth(201).setScrollFactor(0);
     panel.setStrokeStyle(2, 0xffd700);
 
@@ -31,7 +35,7 @@ export class DailySummary {
       fontSize: '14px', color: '#888888',
     }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
 
-    const allObjects = [overlay, panel, title, continueText, ...lineTexts];
+    const allObjects = [overlay, panelBg, panel, title, continueText, ...lineTexts];
 
     const dismiss = () => {
       allObjects.forEach(obj => obj.destroy());

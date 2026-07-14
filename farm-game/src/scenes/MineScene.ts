@@ -53,6 +53,15 @@ export class MineScene extends Phaser.Scene {
     const TILE = GAME_CONFIG.TILE_SIZE;
     const size = MineSystem.FLOOR_SIZE;
 
+    // Mine tiles background
+    const mineBg = this.add.image(
+      size * TILE / 2,
+      size * TILE / 2,
+      'mine_tiles'
+    );
+    mineBg.setDepth(-1);
+    mineBg.setDisplaySize(size * TILE, size * TILE);
+
     this.tileGraphics = [];
     const g = this.add.graphics();
     g.setDepth(0);
@@ -74,44 +83,44 @@ export class MineScene extends Phaser.Scene {
 
   private drawMineTile(g: Phaser.GameObjects.Graphics, tile: MineTileData, x: number, y: number, size: number): void {
     g.clear();
-    g.fillStyle(0x333333);
+    g.fillStyle(0x333333, 0.7);
     g.fillRect(x, y, size, size);
 
     switch (tile.type) {
       case 'rock':
-        g.fillStyle(0x666666);
+        g.fillStyle(0x666666, 0.7);
         g.fillRect(x + 2, y + 2, size - 4, size - 4);
-        g.fillStyle(0x555555);
+        g.fillStyle(0x555555, 0.7);
         g.fillRect(x + 4, y + 4, size - 8, size - 8);
         break;
       case 'ore':
         const oreColors: Record<OreType, number> = { copper: 0xcc7722, iron: 0xaaaaaa, gold: 0xffd700 };
-        g.fillStyle(0x555555);
+        g.fillStyle(0x555555, 0.7);
         g.fillRect(x + 2, y + 2, size - 4, size - 4);
-        g.fillStyle(oreColors[tile.oreType || 'copper']);
+        g.fillStyle(oreColors[tile.oreType || 'copper'], 0.7);
         g.fillRect(x + 5, y + 5, size - 10, size - 10);
-        g.fillStyle(0xffffff, 0.6);
+        g.fillStyle(0xffffff, 0.4);
         g.fillRect(x + 7, y + 7, 3, 3);
         break;
       case 'stairs':
-        g.fillStyle(0x444444);
+        g.fillStyle(0x444444, 0.7);
         g.fillRect(x + 2, y + 2, size - 4, size - 4);
-        g.fillStyle(0x222222);
+        g.fillStyle(0x222222, 0.7);
         for (let i = 0; i < 3; i++) {
           g.fillRect(x + 4 + i * 4, y + 4 + i * 4, size - 8 - i * 8, 3);
         }
         break;
       case 'collectible':
-        g.fillStyle(0x333333);
+        g.fillStyle(0x333333, 0.7);
         g.fillRect(x, y, size, size);
         const collectColors: Record<string, number> = { fossil: 0xddccaa, crystal: 0xaa88ff, relic: 0xffaa55 };
-        g.fillStyle(collectColors[tile.collectibleType || 'fossil'] || 0xffffff);
+        g.fillStyle(collectColors[tile.collectibleType || 'fossil'] || 0xffffff, 0.7);
         g.fillRect(x + 6, y + 6, size - 12, size - 12);
-        g.fillStyle(0xffffff, 0.8);
+        g.fillStyle(0xffffff, 0.6);
         g.fillRect(x + 8, y + 8, 3, 3);
         break;
       case 'empty':
-        g.fillStyle(0x2a2a2a);
+        g.fillStyle(0x2a2a2a, 0.5);
         g.fillRect(x, y, size, size);
         break;
     }

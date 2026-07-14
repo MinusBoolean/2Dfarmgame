@@ -83,6 +83,7 @@ export class FarmScene extends Phaser.Scene {
     this.audio = new AudioSystem(this, this.saveData.settings.musicVolume, this.saveData.settings.sfxVolume);
 
     this.createFarmGrid();
+    this.createDecorations();
     this.createPlayer();
     this.createNightOverlay();
     this.createHud();
@@ -141,6 +142,16 @@ export class FarmScene extends Phaser.Scene {
 
   private createFarmGrid(): void {
     const TILE = GAME_CONFIG.TILE_SIZE;
+
+    // Farm tiles background
+    const farmBg = this.add.image(
+      GAME_CONFIG.FARM_COLS * TILE / 2,
+      GAME_CONFIG.FARM_ROWS * TILE / 2,
+      'farm_tiles'
+    );
+    farmBg.setDepth(-1);
+    farmBg.setDisplaySize(GAME_CONFIG.FARM_COLS * TILE, GAME_CONFIG.FARM_ROWS * TILE);
+
     this.baseMapGraphics = this.add.graphics();
     this.baseMapGraphics.setDepth(0);
 
@@ -222,6 +233,20 @@ export class FarmScene extends Phaser.Scene {
         this.tileGraphics[row][col] = g;
       }
     }
+  }
+
+  private createDecorations(): void {
+    const TILE = GAME_CONFIG.TILE_SIZE;
+
+    // House (northwest)
+    const house = this.add.image(5 * TILE, 7 * TILE, 'decorations');
+    house.setDisplaySize(TILE * 6, TILE * 6);
+    house.setDepth(2);
+
+    // Shipping bin (southwest)
+    const shipper = this.add.image(6 * TILE, 41 * TILE, 'decorations');
+    shipper.setDisplaySize(TILE * 4, TILE * 3);
+    shipper.setDepth(2);
   }
 
   private renderAllTiles(): void {
@@ -521,6 +546,12 @@ export class FarmScene extends Phaser.Scene {
     const totalItems = available.length + trees.length;
     const panelW = 280, panelH = 40 + totalItems * 24;
     const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.6).setDepth(200).setScrollFactor(0);
+
+    const itemsBg = this.add.image(width / 2, height / 2, 'items');
+    itemsBg.setDisplaySize(panelW, panelH);
+    itemsBg.setDepth(200);
+    itemsBg.setScrollFactor(0);
+
     const panel = this.add.rectangle(width / 2, height / 2, panelW, panelH, 0x222222).setDepth(201).setScrollFactor(0);
     panel.setStrokeStyle(2, 0xffd700);
 
@@ -528,7 +559,7 @@ export class FarmScene extends Phaser.Scene {
       fontSize: '16px', color: '#ffd700',
     }).setOrigin(0.5).setDepth(202).setScrollFactor(0);
 
-    this.overlayObjects = [overlay, panel, title];
+    this.overlayObjects = [overlay, itemsBg, panel, title];
 
     if (totalItems === 0) {
       const t = this.add.text(width / 2, height / 2, '当季没有可购买的种子', {
@@ -1195,6 +1226,11 @@ export class FarmScene extends Phaser.Scene {
     const x = col * TILE + TILE / 2;
     const y = row * TILE + TILE / 2;
 
+    const cropOverlay = this.add.image(x, y, 'crops_sheet');
+    cropOverlay.setDisplaySize(TILE * 0.8, TILE * 0.8);
+    cropOverlay.setDepth(2);
+    cropOverlay.setAlpha(0.9);
+
     const glow = this.add.rectangle(x, y, TILE, TILE, 0xffd700, 0.15).setDepth(2);
     const tween = this.tweens.add({
       targets: glow,
@@ -1213,6 +1249,7 @@ export class FarmScene extends Phaser.Scene {
       callback: () => {
         const currentTile = this.saveData.farmGrid[row]?.[col];
         if (!currentTile || currentTile.state !== 'mature') {
+          cropOverlay.destroy();
           glow.destroy();
           tween.destroy();
           checkInterval.destroy();

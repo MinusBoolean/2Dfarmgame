@@ -33,6 +33,9 @@ export class ShippingBinPanel {
 
   private render(): void {
     this.container.removeAll(true);
+    const panelBg = this.scene.add.image(0, 0, 'ui_elements');
+    panelBg.setDisplaySize(400, 300);
+    this.container.add(panelBg);
     const bg = this.scene.add.rectangle(0, 0, 400, 300, 0x222222, 0.95).setStrokeStyle(2, 0xffd700);
     this.container.add(bg);
     this.container.add(this.scene.add.text(0, -135, '出货箱', { fontSize: '18px', color: '#ffd700' }).setOrigin(0.5));

@@ -41,6 +41,16 @@ export class BootScene extends Phaser.Scene {
     // Items
     this.load.image('items', 'assets/sprites/items.png');
 
+    // Mine
+    this.load.image('mine_tiles', 'assets/sprites/mine_tiles.png');
+    this.load.image('ores', 'assets/sprites/ores.png');
+
+    // Pond
+    this.load.image('pond_sprites', 'assets/sprites/pond_sprites.png');
+
+    // Greenhouse
+    this.load.image('greenhouse_sprites', 'assets/sprites/greenhouse_sprites.png');
+
     // Audio (optional - don't fail if missing)
     try {
       this.load.audio('bgm_day', ['assets/audio/bgm/farm_day.mp3']);

@@ -38,6 +38,12 @@ export class PondScene extends Phaser.Scene {
 
   private createPondMap(): void {
     const TILE = GAME_CONFIG.TILE_SIZE;
+
+    // Pond background
+    const pondBg = this.add.image(32 * TILE / 2, 32 * TILE / 2, 'pond_sprites');
+    pondBg.setDepth(-1);
+    pondBg.setDisplaySize(32 * TILE, 32 * TILE);
+
     const g = this.add.graphics();
 
     // Grass everywhere

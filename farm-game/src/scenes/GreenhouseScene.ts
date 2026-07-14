@@ -35,6 +35,16 @@ export class GreenhouseScene extends Phaser.Scene {
 
   private createGreenhouseMap(): void {
     const TILE = GAME_CONFIG.TILE_SIZE;
+
+    // Greenhouse background
+    const greenhouseBg = this.add.image(
+      12 * TILE * 2 / 2,
+      16 * TILE * 2 / 2,
+      'greenhouse_sprites'
+    );
+    greenhouseBg.setDepth(-1);
+    greenhouseBg.setDisplaySize(12 * TILE * 2, 16 * TILE * 2);
+
     const g = this.add.graphics();
 
     // Glass walls

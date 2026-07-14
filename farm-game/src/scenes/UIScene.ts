@@ -17,6 +17,11 @@ export class UIScene extends Phaser.Scene {
   constructor() { super({ key: 'UIScene' }); }
 
   create(): void {
+    // Top bar background
+    const topBarBg = this.add.image(400, 14, 'ui_elements');
+    topBarBg.setDisplaySize(796, 28);
+    topBarBg.setDepth(0);
+
     this.add.rectangle(400, 16, 796, 28, 0x000000, 0.5).setOrigin(0.5, 0.5);
 
     this.goldText = this.add.text(12, 4, '100', { fontSize: '14px', color: '#ffd700' });
@@ -52,7 +57,10 @@ export class UIScene extends Phaser.Scene {
     const totalW = tools.length * (slotW + gap) - gap;
     const startX = (800 - totalW) / 2;
 
+    this.add.image(400, startY + 20, 'ui_elements').setDisplaySize(totalW + 12, slotH + 8);
     this.add.rectangle(400, startY + 20, totalW + 12, slotH + 8, 0x000000, 0.6).setOrigin(0.5, 0.5);
+
+    this.add.image(startX - 28, startY + 20, 'items').setDisplaySize(24, 24);
 
     for (let i = 0; i < tools.length; i++) {
       const x = startX + i * (slotW + gap);

@@ -43,6 +43,10 @@ export class WorkshopPanel {
   private render(): void {
     this.container.removeAll(true);
 
+    const panelBg = this.scene.add.image(0, 0, 'ui_elements');
+    panelBg.setDisplaySize(500, 350);
+    this.container.add(panelBg);
+
     const bg = this.scene.add.rectangle(0, 0, 500, 350, 0x222222, 0.95);
     bg.setStrokeStyle(2, 0xffd700);
     this.container.add(bg);
