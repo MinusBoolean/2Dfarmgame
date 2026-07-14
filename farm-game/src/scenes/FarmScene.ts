@@ -12,6 +12,9 @@ import { AudioSystem } from '../systems/AudioSystem';
 import { RatingSystem } from '../systems/RatingSystem';
 import { TutorialSystem } from '../systems/TutorialSystem';
 import { DailySummary } from '../ui/DailySummary';
+import { WorkshopPanel } from '../ui/WorkshopPanel';
+import { BulletinBoard } from '../ui/BulletinBoard';
+import { QuestSystem } from '../systems/QuestSystem';
 import { getCropById, getUnlockedCrops } from '../entities/CropConfig';
 
 type Direction = 'up' | 'down' | 'left' | 'right';
@@ -57,6 +60,8 @@ export class FarmScene extends Phaser.Scene {
   private overlayObjects: Phaser.GameObjects.GameObject[] = [];
   private shopOpen: boolean = false;
   private seedSelectOpen: boolean = false;
+  private workshopPanel!: WorkshopPanel;
+  private bulletinBoard!: BulletinBoard;
 
   constructor() {
     super({ key: 'FarmScene' });
@@ -73,6 +78,19 @@ export class FarmScene extends Phaser.Scene {
     this.createHud();
     this.createMessageText();
     this.setupInput();
+
+    // Initialize WorkshopPanel and BulletinBoard
+    this.workshopPanel = new WorkshopPanel(this, this.saveData, this.inventory);
+    this.workshopPanel.setOnCraft(() => {
+      this.emitEvent('gold-changed', this.saveData.gold);
+      this.emitEvent('save-indicator');
+      SaveSystem.save(this.saveData);
+    });
+    this.bulletinBoard = new BulletinBoard(this, this.saveData);
+    this.bulletinBoard.setOnQuestUpdate(() => {
+      this.emitEvent('save-indicator');
+      SaveSystem.save(this.saveData);
+    });
 
     if (this.saveData.tomorrowWeather === 'sunny' && this.saveData.currentDay === 1 && this.saveData.currentSeason === 0) {
       this.saveData.tomorrowWeather = WeatherSystem.generateWeather(
@@ -127,6 +145,21 @@ export class FarmScene extends Phaser.Scene {
           color = 0xa67c2e;
         }
 
+        // Mine entrance
+        if (row >= 45 && row < 48 && col >= 30 && col < 35) {
+          color = 0x444444;
+        }
+
+        // Workshop
+        if (row >= 35 && row < 38 && col >= 28 && col < 32) {
+          color = 0x8B4513;
+        }
+
+        // Bulletin board
+        if (row >= 10 && row < 12 && col >= 5 && col < 8) {
+          color = 0xA0522D;
+        }
+
         this.baseMapGraphics.fillStyle(color);
         this.baseMapGraphics.fillRect(x, y, TILE, TILE);
       }
@@ -140,6 +173,11 @@ export class FarmScene extends Phaser.Scene {
     for (let col = 0; col <= GAME_CONFIG.FARM_COLS; col++) {
       this.baseMapGraphics.lineBetween(col * TILE, 0, col * TILE, GAME_CONFIG.FARM_ROWS * TILE);
     }
+
+    // Building labels
+    this.add.text(32 * TILE, 46 * TILE, '矿洞入口', { fontSize: '10px', color: '#ffd700' }).setOrigin(0.5).setDepth(5);
+    this.add.text(30 * TILE, 36 * TILE, '工坊', { fontSize: '10px', color: '#ffd700' }).setOrigin(0.5).setDepth(5);
+    this.add.text(6 * TILE, 11 * TILE, '公告板', { fontSize: '10px', color: '#ffd700' }).setOrigin(0.5).setDepth(5);
 
     // Per-tile overlay graphics
     this.tileGraphics = [];
@@ -373,7 +411,24 @@ export class FarmScene extends Phaser.Scene {
     this.input.keyboard.on('keydown-THREE', () => this.selectTool('food'));
     this.input.keyboard.on('keydown-SPACE', () => this.useTool());
     this.input.keyboard.on('keydown-B', () => this.toggleInventory());
-    this.input.keyboard.on('keydown-E', () => this.toggleShop());
+    this.input.keyboard.on('keydown-E', () => {
+      const { row, col } = this.getFacingTile();
+      if (row >= 45 && row < 48 && col >= 30 && col < 35) {
+        this.tryEnterMine();
+        return;
+      }
+      this.toggleShop();
+    });
+    this.input.keyboard.on('keydown-W', () => {
+      if (this.isNearWorkshop()) {
+        this.workshopPanel.toggle();
+      }
+    });
+    this.input.keyboard.on('keydown-T', () => {
+      if (this.isNearBulletinBoard()) {
+        this.bulletinBoard.toggle();
+      }
+    });
     this.input.keyboard.on('keydown-P', () => this.togglePause());
     this.input.keyboard.on('keydown-Q', () => this.cycleSeed());
     this.input.keyboard.on('keydown-H', () => this.tryHarvest());
@@ -466,6 +521,23 @@ export class FarmScene extends Phaser.Scene {
     if (this.isPaused) {
       this.showMessage('暂停中 (P继续)');
     }
+  }
+
+  private tryEnterMine(): void {
+    const { row, col } = this.getFacingTile();
+    if (row >= 45 && row < 48 && col >= 30 && col < 35) {
+      this.scene.start('MineScene', { saveData: this.saveData });
+    }
+  }
+
+  private isNearWorkshop(): boolean {
+    const { row, col } = this.getFacingTile();
+    return row >= 34 && row < 39 && col >= 27 && col < 33;
+  }
+
+  private isNearBulletinBoard(): boolean {
+    const { row, col } = this.getFacingTile();
+    return row >= 9 && row < 13 && col >= 4 && col < 9;
   }
 
   private closeOverlay(): void {
@@ -892,6 +964,9 @@ export class FarmScene extends Phaser.Scene {
 
     this.settleShippingBin();
     this.checkCrows();
+
+    // Generate daily quests
+    QuestSystem.generateDailyQuests(this.saveData);
 
     // Rating check
     const newRating = RatingSystem.checkRating(this.saveData);
